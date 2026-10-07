@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>聖アルヴェリック学園 キャンパスマップ</title>
+<title>国立スライム学園 キャンパスマップ</title>
 <style>
   :root {
     --ink: #4e4a45;
@@ -590,12 +590,10 @@ const setAllRoofs = open => BUILDINGS.forEach(b => toggleRoof(b.id, open));
   const notch = (x, y, w, h, r) => `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 0 ${x + w},${y + r} V${y + h - r} A${r},${r} 0 0 0 ${x + w - r},${y + h} H${x + r} A${r},${r} 0 0 0 ${x},${y + h - r} V${y + r} A${r},${r} 0 0 0 ${x + r},${y} Z`;
   let s = '';
   s += `<path d="${notch(-484, -54, 448, 300, 26)}" fill="#f5f0e4" stroke="#a8a092" stroke-width="2.5"/><path d="${notch(-472, -42, 424, 276, 22)}" fill="none" stroke="#a8a092" stroke-width="1"/>`;
-  s += '<g transform="translate(-260,14)"><path d="M-27,-32 H27 V4 C27,26 0,38 0,38 C0,38 -27,26 -27,4 Z" fill="#6b7588" stroke="#4e4a45" stroke-width="2"/>' +
-       '<path d="M0,-20 L5,-6 L19,-6 L8,3 L12,17 L0,8 L-12,17 L-8,3 L-19,-6 L-5,-6 Z" fill="#f5f0e4"/></g>';
-  s += '<text x="-260" y="106" text-anchor="middle" font-size="40" fill="#4e4a45" style="font-family:Georgia,\'Times New Roman\',serif">St. Alveric Academy</text>';
-  s += '<text x="-260" y="148" text-anchor="middle" font-size="26" font-weight="bold" fill="#4e4a45" letter-spacing="5">聖アルヴェリック学園</text>';
-  s += '<text x="-260" y="190" text-anchor="middle" font-size="24" fill="#7a736a" style="font-family:Georgia,\'Times New Roman\',serif">Campus Map</text>';
-  s += '<path d="M-340,212 H-282 M-238,212 H-180" stroke="#8a8378" stroke-width="1.2"/><path d="M-260,203 l9,9 l-9,9 l-9,-9 Z" fill="#6b7588"/>';
+  s += '<path transform="translate(-260,28) scale(2.1)" d="M0,-20 L5,-6 L19,-6 L8,3 L12,17 L0,8 L-12,17 L-8,3 L-19,-6 L-5,-6 Z" fill="#6b7588"/>';
+  s += '<text x="-260" y="132" text-anchor="middle" font-size="44" font-weight="bold" fill="#4e4a45" letter-spacing="4">国立スライム学園</text>';
+  s += '<text x="-260" y="182" text-anchor="middle" font-size="24" fill="#7a736a" style="font-family:Georgia,serif">Campus Map</text>';
+  s += '<path d="M-340,206 H-180" stroke="#8a8378" stroke-width="1.2"/>';
   // 凡例
   s += '<rect x="-484" y="290" width="448" height="502" rx="8" fill="#f5f0e4" stroke="#a8a092" stroke-width="2.5"/>';
   [...BUILDINGS, FIELD].sort((a, b) => a.n - b.n).forEach((b, i) => {
@@ -826,7 +824,7 @@ class Walker {
     this.leader = null; this.followers = []; this.gather = 0; // 一緒に行動する相手
     const g = document.createElementNS(SVGNS, 'g');
     g.innerHTML = `<g transform="scale(${CHAR_SCALE})"><g class="fig">${FIGURE}</g></g><text class="char-name" y="${-44 * CHAR_SCALE - 2}"></text>`;
-    g.querySelector('text').textContent = this.name;
+    this.label = g.querySelector('text'); this.label.textContent = this.name; this.labelText = this.name;
     this.g = g; this.fig = g.querySelector('.fig');
     this.lL = g.querySelector('.lL'); this.lR = g.querySelector('.lR'); this.aL = g.querySelector('.aL'); this.aR = g.querySelector('.aR');
     $('chars').appendChild(g);
@@ -959,6 +957,31 @@ function formGroups(jump, list = walkers) {
   }
 }
 
+// 一緒に行動している間は、名前を「A＋B」「A＋B＋C」とまとめて1つだけ表示する(重なって読めなくなるのを防ぐ)
+const isBeside = (a, b) => !a.away && !b.away && a.at.f === b.at.f && Math.hypot(a.x - b.x, a.y - b.y) < 26;
+function showLabels() {
+  for (const w of walkers) {
+    let t = w.name;
+    if (w.leader && isBeside(w, w.leader)) t = '';                // 相手の名札にまとめられる
+    else if (w.followers.length) {
+      const fs = w.followers.filter(f => isBeside(f, w));
+      if (fs.length) t = [w.name, ...fs.map(f => f.name)].join('＋');
+    }
+    if (t !== w.labelText) { w.label.textContent = t; w.labelText = t; }
+  }
+  // 近くにいる別の人の名札と重なるときは、1行ぶんずつ上へずらす
+  const u = upx() || 2, lineH = 13 * u, baseY = -44 * CHAR_SCALE - 2, placed = [];
+  for (const w of [...walkers].sort((a, b) => b.y - a.y)) {
+    if (!w.labelText || !w.vis) continue;
+    const half = w.labelText.length * 11 * u / 2 + 2 * u, cx = w.x + w.ox;
+    let top = w.y + w.oy + baseY - lineH;
+    while (placed.some(p => cx - half < p.x1 && cx + half > p.x0 && top < p.y1 && top + lineH > p.y0)) top -= lineH;
+    placed.push({ x0: cx - half, x1: cx + half, y0: top, y1: top + lineH });
+    const ly = (top + lineH - (w.y + w.oy)).toFixed(1);
+    if (ly !== w.labelY) { w.label.setAttribute('y', ly); w.labelY = ly; }
+  }
+}
+
 // 帰宅中の人の一覧(アイコン+名前+「帰宅」)
 const AWAY_ICON = `<svg viewBox="-12 -42 24 44" width="11" height="20" aria-hidden="true">${FIGURE}</svg>`;
 let awayKey = null;
@@ -976,7 +999,7 @@ function spawn(chars) {
   $('chars').innerHTML = '';
   let residents = 0;
   walkers = chars.map(c => new Walker(c, c.type === 'dorm' ? residents++ : 0));
-  formGroups(true);
+  formGroups(true); showLabels();
   awayKey = null; showAway();
 }
 
@@ -1003,7 +1026,7 @@ function setTime(m) { // 時刻を直接指定(全員をその時間帯の場所
   gameMin = ((m % 1440) + 1440) % 1440;
   curPeriod = periodAt(gameMin); curCommute = commuteState(gameMin);
   walkers.forEach(w => w.plan(true));
-  formGroups(true);
+  formGroups(true); showLabels();
   showAway(); showClock();
 }
 $('clkSlider').addEventListener('pointerdown', () => { sliderHeld = true; });
@@ -1029,6 +1052,7 @@ function tick(now) {
   }
   for (const w of walkers) rate ? w.step(dt * mul) : w.draw(0);
   showClock();
+  if (frame % 6 === 0) showLabels();
   if (++frame % 30 === 0) { // 手前の人を上に描く
     const sorted = [...walkers].sort((a, b) => (a.y + a.oy) - (b.y + b.oy));
     const layer = $('chars');
