@@ -1,0 +1,1186 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>聖アルヴェリック学園 キャンパスマップ</title>
+<style>
+  :root {
+    --ink: #4e4a45;
+    --cream: #f5f0e4;
+    --accent: #6b7588;
+    --u: 2;
+    --serif: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Noto Serif JP", "MS Mincho", serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #c9c9cb; overflow: hidden; font-family: var(--serif); color: var(--ink); }
+  #map { display: block; width: 100vw; height: 100vh; height: 100dvh; cursor: grab; touch-action: none; user-select: none; }
+  #map.panning { cursor: grabbing; }
+  #map text { font-family: var(--serif); }
+
+  /* ---- 間取り ---- */
+  .wall { stroke: #55504a; stroke-width: 4.5; stroke-linejoin: miter; }
+  .part { stroke: #55504a; stroke-width: 2.4; fill: none; }
+  .door { stroke-width: 6.5; fill: none; }
+  .rl { font-size: 9px; fill: #6f675c; text-anchor: middle; letter-spacing: .5px; pointer-events: none; stroke: #f1ead9; stroke-width: 2.5px; paint-order: stroke; stroke-linejoin: round; }
+  .floor { display: none; }
+  .floor.on { display: inline; }
+
+  /* ---- 屋根 ---- */
+  .roof { cursor: pointer; transition: opacity .35s ease; }
+  .roof:hover { opacity: .88; }
+  .roof.open { opacity: 0; pointer-events: none; }
+  .interior { cursor: pointer; }
+  .badge { pointer-events: none; }
+  .badge circle { fill: #4e4a45; stroke: #f5f0e4; stroke-width: 2; }
+  .badge text { font-family: Georgia, "Times New Roman", serif; font-size: 17px; font-weight: bold; fill: #f5f0e4; text-anchor: middle; }
+  .legend-row { cursor: pointer; }
+  .legend-row:hover .legend-name { fill: #6b7588; }
+  .legend-name { font-size: 27px; font-weight: bold; fill: #4e4a45; }
+  .legend-sub { font-size: 16px; fill: #8a8378; }
+
+  /* ---- キャラクター ---- */
+  #chars { pointer-events: none; }
+  .char-name { font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; font-size: calc(var(--u) * 11px); font-weight: bold; fill: #111; text-anchor: middle;
+               stroke: #fbf8f0; stroke-width: calc(var(--u) * 3px); paint-order: stroke; stroke-linejoin: round; }
+
+  /* ---- UI ---- */
+  #night { position: fixed; inset: 0; background: #1c2540; opacity: 0; pointer-events: none; }
+  button, select, input { font-family: var(--serif); }
+  button { font-size: 14px; font-weight: bold; color: var(--ink); background: var(--cream); border: 1.5px solid var(--ink);
+           border-radius: 5px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+  button:hover { background: #fff; }
+  button.primary { background: var(--accent); color: #fff; border-color: #4e5666; }
+  button.primary:hover { background: #7a8498; }
+  .seg { display: flex; align-items: stretch; background: var(--cream); border: 1.5px solid var(--ink); border-radius: 5px; overflow: hidden; }
+  .seg > span { display: flex; align-items: center; font-size: 13px; font-weight: bold; padding: 0 10px 0 12px; white-space: nowrap; }
+  .seg button { border: 0; border-left: 1.5px solid var(--ink); border-radius: 0; }
+  .seg button.on { background: var(--ink); color: var(--cream); }
+
+  #toolbar { position: fixed; top: 10px; left: 10px; right: 10px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; pointer-events: none; }
+  #toolbar > * { pointer-events: auto; }
+
+  #bottom { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+  #bottom > * { pointer-events: auto; max-width: 100%; }
+  #away { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; background: rgba(245,240,228,.96);
+          border: 1.5px solid var(--ink); border-radius: 5px; padding: 6px 10px; font-size: 13px; }
+  #away[hidden] { display: none; }
+  #away > b { margin-right: 4px; white-space: nowrap; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 6px; border: 1px solid #b5ad9e; border-radius: 999px; background: #fdfbf5;
+          white-space: nowrap; font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; font-weight: bold; }
+  .chip svg { opacity: .45; flex: none; }
+  .chip em { font-style: normal; font-size: 11px; font-weight: normal; color: #8a8378; }
+  #clock { display: flex; align-items: center; justify-content: center; flex-wrap: nowrap; gap: 8px 14px; width: min(100%, 800px); background: rgba(245,240,228,.96);
+           border: 1.5px solid var(--ink); border-radius: 5px; padding: 8px 14px; }
+  #clock .now { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+  #clkTime { font-family: Georgia, "Times New Roman", serif; font-size: 24px; font-weight: bold; font-variant-numeric: tabular-nums; min-width: 3em; }
+  #clkPeriod { font-size: 13px; font-weight: bold; min-width: 6.5em; }
+  #clkSlider { flex: 1 1 180px; min-width: 120px; accent-color: #4e4a45; margin: 0; }
+  #clock .seg button { padding: 6px 10px; font-size: 13px; }
+  #hint { position: fixed; right: 10px; bottom: 10px; font-size: 12px; background: rgba(245,240,228,.94); border: 1px solid #b5ad9e; border-radius: 5px; padding: 6px 10px; white-space: nowrap; }
+  #toast { position: fixed; left: 50%; top: 70px; transform: translateX(-50%); background: #4e4a45; color: #f5f0e4; padding: 10px 20px; border-radius: 5px;
+           font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+
+  dialog { font-family: var(--serif); color: var(--ink); background: var(--cream); border: 2px solid var(--ink); border-radius: 8px; padding: 20px 22px;
+           width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+  dialog::backdrop { background: rgba(40,38,35,.45); }
+  dialog h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: 2px; }
+  dialog p { margin: 0 0 12px; font-size: 13px; line-height: 1.6; }
+  #rows { max-height: min(46dvh, 420px); overflow-y: auto; margin-bottom: 8px; }
+  .crow { display: flex; gap: 6px; margin-bottom: 6px; }
+  .crow input { flex: 1; min-width: 0; font-family: "Yu Gothic", "Meiryo", sans-serif; font-size: 16px; padding: 7px 10px; border: 1.5px solid #b5ad9e; border-radius: 5px; background: #fdfbf5; color: #222; }
+  .crow select { font-size: 16px; font-weight: bold; padding: 6px 6px; border: 1.5px solid #b5ad9e; border-radius: 5px; background: #fdfbf5; color: var(--ink); }
+  .crow .del { padding: 6px 10px; }
+  .crow select { flex: none; }
+  dialog .count { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin: 0 0 14px; }
+  dialog .row { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
+  dialog .row div { display: flex; gap: 8px; }
+
+  /* ---- 画面の幅に合わせる ---- */
+  @media (max-width: 1700px) { #hint { display: none; } }
+  @media (max-width: 720px) {
+    button { font-size: 12px; padding: 7px 9px; }
+    .seg > span { font-size: 12px; padding: 0 7px 0 9px; }
+    #toolbar { top: 6px; left: 6px; right: 6px; gap: 6px; }
+    #bottom { padding: 6px; gap: 6px; }
+    #clock { width: 100%; padding: 8px 10px; flex-wrap: wrap; }
+    #clkTime { font-size: 21px; }
+    #clkSlider { flex-basis: 150px; }
+    #clock .seg button { padding: 6px 9px; font-size: 12px; }
+    #away { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<svg id="map" xmlns="http://www.w3.org/2000/svg" viewBox="-520 -100 3040 1800" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <clipPath id="infield"><rect x="1434" y="1134" width="732" height="272" rx="136"/></clipPath>
+    <g id="t"><circle r="17" fill="#9db396" stroke="#86a07f" stroke-width="1.5"/></g>
+    <g id="t2"><circle r="17" fill="#a9bca2" stroke="#8fa688" stroke-width="1.5"/></g>
+    <g id="ts"><circle r="10" fill="#a3b89c" stroke="#8aa283" stroke-width="1.3"/></g>
+    <g id="plot">
+      <rect width="52" height="58" fill="#b9c4a6" stroke="#93a087" stroke-width="1.5"/>
+      <path d="M8,12 H44 M8,24 H44 M8,36 H44 M8,48 H44" stroke="#93a087" stroke-width="1.2"/>
+    </g>
+    <g id="spike">
+      <path d="M0,-50 L7,-7 L0,0 Z" fill="#4e4a45"/>
+      <path d="M0,-50 L-7,-7 L0,0 Z" fill="#f5f0e4" stroke="#4e4a45" stroke-width="1"/>
+    </g>
+  </defs>
+
+  <g id="city"></g>
+  <g id="ground"></g>
+  <g id="interiors"></g>
+  <g id="chars"></g>
+  <g id="roofs"></g>  <g id="badges"></g>
+  <g id="panels"></g>
+</svg>
+
+<div id="night"></div>
+<div id="toolbar">
+  <div class="seg" id="floorSeg"><span>表示する階</span><button data-f="1" class="on">1階</button><button data-f="2">2階</button><button data-f="3">3階</button></div>
+  <div class="seg" id="zoomSeg"><span>拡大縮小</span><button data-z="1.5" aria-label="縮小">−</button><button data-z="0.667" aria-label="拡大">＋</button></div>
+  <button id="btnReset">表示リセット</button>
+  <button id="btnFull" hidden>全画面</button>
+  <button id="btnNames" class="primary">キャラクター登録</button>
+</div>
+<div id="hint">建物をクリック：屋根の開閉 ／ ホイール・ピンチ：拡大縮小 ／ ドラッグ：移動</div>
+<div id="bottom">
+  <div id="away" hidden></div>
+  <div id="clock">
+    <div class="now"><span id="clkTime">08:00</span><span id="clkPeriod"></span></div>
+    <input type="range" id="clkSlider" min="0" max="1435" step="5" value="480" aria-label="時刻">
+    <div class="seg" id="speedSeg"><span>時間の進み</span><button data-s="0">停止</button><button data-s="1" class="on">ゆっくり</button><button data-s="2">ふつう</button><button data-s="3">速い</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<dialog id="namesDlg">
+  <h2>キャラクター登録</h2>
+  <p>名前・学年・「寮生/通学」を選んでください。通学の人は 8:00 に登校し、18:00 に帰宅します。<br>「保存」を押すと、このブラウザに記憶されます。</p>
+  <div id="rows"></div>
+  <div class="count"><button id="rowAdd" type="button">＋ 追加</button><span id="namesCount"></span></div>
+  <div class="row">
+    <button id="namesDefault" type="button">初期値に戻す</button>
+    <div><button id="namesCancel" type="button">キャンセル</button><button id="namesSave" type="button" class="primary">保存</button></div>
+  </div>
+</dialog>
+
+<script>
+/* =====================================================================
+   ★ キャラクター(初期値)
+   画面右上の「キャラクター登録」から編集・保存できます。
+   ファイルそのものの初期値を変えたい場合は、ここを書き換えてください。
+   grade: 学年(1〜6) / type: 'dorm' = 寮生, 'commute' = 通学
+   ===================================================================== */
+const DEFAULT_CHARACTERS = [
+  { name: '生徒A', grade: 1, type: 'dorm' }, { name: '生徒B', grade: 1, type: 'dorm' }, { name: '生徒C', grade: 2, type: 'dorm' },
+  { name: '生徒D', grade: 2, type: 'dorm' }, { name: '生徒E', grade: 3, type: 'dorm' }, { name: '生徒F', grade: 4, type: 'dorm' },
+  { name: '生徒G', grade: 1, type: 'commute' }, { name: '生徒H', grade: 2, type: 'commute' }, { name: '生徒I', grade: 5, type: 'commute' }, { name: '生徒J', grade: 6, type: 'commute' }
+];
+const STORAGE_KEY = 'st-alveric-campus-names';
+const MAX_CHARACTERS = 12; // 動作が重くならない人数
+
+/* ---------- 小道具 ---------- */
+const $ = id => document.getElementById(id);
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* =====================================================================
+   街並み(敷地の外)
+   ===================================================================== */
+(function buildCity() {
+  const r = rng(11);
+  const X = [[-520, -280], [-190, 10], [120, 630], [710, 1690], [1770, 2280], [2390, 2520]];
+  const Y = [[-100, 10], [120, 420], [500, 1090], [1170, 1520], [1630, 1700]];
+  const fills = ['#d8d5cf', '#d3d0ca', '#dcd9d3', '#d0cdc8'];
+  let s = '<rect x="-520" y="-100" width="3040" height="1800" fill="#c9c9cb"/>';
+  s += '<g stroke="#dededf" stroke-width="2" stroke-dasharray="18 16" fill="none">' +
+       '<path d="M-520,65 H2520 M-520,1575 H2520 M65,-100 V1700 M2335,-100 V1700 M-235,-100 V1700 M670,-100 V20 M1730,-100 V20 M670,1620 V1700 M1730,1620 V1700 M-520,460 H20 M-520,1130 H20 M2380,460 H2520 M2380,1130 H2520"/></g>';
+  function lot(x0, y0, x1, y1, d) {
+    const w = x1 - x0, h = y1 - y0;
+    if (d < 4 && (w > 170 || h > 150) && r() < 0.92) {
+      if (w >= h) { const m = x0 + w * (0.35 + r() * 0.3); return lot(x0, y0, m, y1, d + 1) + lot(m, y0, x1, y1, d + 1); }
+      const m = y0 + h * (0.35 + r() * 0.3); return lot(x0, y0, x1, m, d + 1) + lot(x0, m, x1, y1, d + 1);
+    }
+    const p = 6;
+    return `<rect x="${x0 + p}" y="${y0 + p}" width="${w - 2 * p}" height="${h - 2 * p}" fill="${fills[Math.floor(r() * fills.length)]}" stroke="#c2bfb9" stroke-width="1.2"/>`;
+  }
+  for (let xi = 0; xi < X.length; xi++) for (let yi = 0; yi < Y.length; yi++) {
+    if (xi >= 2 && xi <= 4 && yi >= 1 && yi <= 3) continue;
+    const [x0, x1] = X[xi], [y0, y1] = Y[yi];
+    s += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="4" fill="#e3e0da"/>` + lot(x0 + 4, y0 + 4, x1 - 4, y1 - 4, 0);
+  }
+  const zebra = (x, y, w, h, vert) => { let o = ''; const n = 6; for (let i = 0; i < n; i++) o += vert ? `<rect x="${x + i * w / n + 2}" y="${y}" width="${w / n - 5}" height="${h}" fill="#e6e6e7"/>` : `<rect x="${x}" y="${y + i * h / n + 2}" width="${w}" height="${h / n - 5}" fill="#e6e6e7"/>`; return o; };
+  s += zebra(1160, 1540, 80, 70, true) + zebra(640, 30, 60, 70, true) + zebra(30, 430, 70, 60, false) + zebra(2300, 1100, 70, 60, false);
+  $('city').innerHTML = s;
+})();
+
+/* =====================================================================
+   地面(芝・小道・池・運動場・木)
+   ===================================================================== */
+const PATHS = 'M1130,860 H300 M700,860 V400 H300 M700,500 H840 M843,860 V960 M843,1160 V1210 M1270,860 H1680 M1430,860 V895 M1620,500 V1090 M1560,500 H1820 V410 M650,860 V1300 H510 M1820,500 H1930 Q1975,480 1990,410';
+const FOOT = {
+  main: 'M840,240 H1120 L1150,200 H1250 L1280,240 H1560 V720 H1250 V756 H1150 V720 H840 Z M970,390 H1430 V610 H970 Z',
+  mainUp: 'M840,240 H1120 L1150,200 H1250 L1280,240 H1560 V720 H840 Z M970,390 H1430 V610 H970 Z',
+  dorm: 'M190,230 H570 V330 H300 V470 H570 V570 H190 Z',
+  dining: 'M720,960 H1080 V1160 H720 Z',
+  gym: 'M1680,740 H2020 V980 H1680 Z',
+  green: 'M1708,250 H1932 L1950,268 V392 L1932,410 H1708 L1690,392 V268 Z',
+  lib: 'M1290,895 H1570 V1065 H1290 Z'
+};
+const WATER = 'fill="#bccfd5" stroke="#93adb6" stroke-width="1.5"';
+const STONE = 'fill="#e6dfcf" stroke="#b5ad9e" stroke-width="1.5"';
+
+(function buildGround() {
+  let s = '';
+  s += '<rect x="110" y="110" width="2180" height="1420" rx="6" fill="#e3e0da"/>';
+  s += '<rect x="140" y="140" width="2120" height="1360" fill="#c8d3b6"/>';
+
+  // 湖
+  const lake = 'M2040,205 C2105,165 2215,190 2232,280 C2247,370 2212,480 2147,500 C2082,520 2022,460 2015,380 C2010,310 1992,245 2040,205 Z';
+  s += `<path d="${lake}" ${WATER} stroke-width="2"/>`;
+  s += `<path d="${lake}" transform="translate(2122,348) scale(.8) translate(-2122,-348)" fill="none" stroke="#a9c0c8" stroke-width="1.2"/><path d="${lake}" transform="translate(2122,348) scale(.58) translate(-2122,-348)" fill="none" stroke="#a9c0c8" stroke-width="1.2"/>`;
+  s += '<rect x="1978" y="391" width="54" height="11" fill="#cdbfa6" stroke="#9c8f78" stroke-width="1.2"/>';
+
+  // 小道
+  s += `<g fill="none" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M1200,1540 V760" stroke="#cbc2ab" stroke-width="47" stroke-linecap="butt"/><path d="${PATHS}" stroke="#cbc2ab" stroke-width="27"/>
+    <circle cx="400" cy="1300" r="110" stroke="#cbc2ab" stroke-width="27"/>
+    <path d="M1200,1540 V760" stroke="#ece5d3" stroke-width="44" stroke-linecap="butt"/><path d="${PATHS}" stroke="#ece5d3" stroke-width="24"/>
+    <circle cx="400" cy="1300" r="110" stroke="#ece5d3" stroke-width="24"/></g>`;
+
+  // 噴水広場
+  s += '<circle cx="1200" cy="860" r="74" fill="#ece5d3" stroke="#cbc2ab" stroke-width="1.5"/>';
+  s += '<circle cx="1200" cy="860" r="52" fill="none" stroke="#cbc2ab" stroke-width="1.2"/>';
+  s += `<circle cx="1200" cy="860" r="28" ${STONE}/><circle cx="1200" cy="860" r="22" ${WATER}/><circle cx="1200" cy="860" r="5" ${STONE}/>`;
+
+  // 庭園(南西)
+  s += '<circle cx="400" cy="1300" r="97" fill="#c8d3b6"/>';
+  s += '<circle cx="400" cy="1300" r="82" fill="none" stroke="#a3b89c" stroke-width="9" stroke-dasharray="115 13.8"/>';
+  s += `<circle cx="400" cy="1300" r="58" ${STONE}/><circle cx="400" cy="1300" r="51" ${WATER}/><circle cx="400" cy="1300" r="7" ${STONE}/>`;
+
+  // 花壇とベンチ(温室の南)
+  const walk = 'M1820,512 V688 M1702,614 H1938';
+  s += `<path d="${walk}" stroke="#cbc2ab" stroke-width="19" stroke-linecap="round"/><path d="${walk}" stroke="#ece5d3" stroke-width="16" stroke-linecap="round"/>`;
+  const petals = ['#d7b4b9', '#e2d6a6', '#c0b5d3', '#ece7dc'];
+  const flowerBed = (x, y, w, h) => {
+    let o = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#b7c6a3" stroke="#93a887" stroke-width="1.5"/>`, row = 0;
+    for (let yy = y + 11; yy < y + h - 6; yy += 13, row++) for (let xx = x + 11 + (row % 2) * 7; xx < x + w - 7; xx += 14) o += `<circle cx="${xx}" cy="${yy}" r="3.2" fill="${petals[Math.floor((xx * 3 + yy) / 7) % petals.length]}"/>`;
+    return o;
+  };
+  s += flowerBed(1704, 538, 98, 60) + flowerBed(1838, 538, 98, 60) + flowerBed(1704, 630, 98, 60) + flowerBed(1838, 630, 98, 60);
+  const bench = (cx, cy, rot) => `<rect x="-13" y="-4" width="26" height="8" rx="2" fill="#bfae92" stroke="#948467" stroke-width="1.2" transform="translate(${cx},${cy}) rotate(${rot})"/>`;
+  s += bench(1690, 614, 90) + bench(1950, 614, 90) + bench(1820, 700, 0);
+  for (const a of [45, 135, 225, 315]) s += bench(1200 + 62 * Math.cos(a * Math.PI / 180), 860 + 62 * Math.sin(a * Math.PI / 180), a + 90);
+  s += bench(400, 1175, 0) + bench(275, 1300, 90) + bench(400, 1425, 0);
+
+  // ⑤ 運動場
+  s += '<rect x="1390" y="1090" width="820" height="360" rx="180" fill="#cdab9d" stroke="#ab8c7f" stroke-width="2"/>';
+  s += '<rect x="1401" y="1101" width="798" height="338" rx="169" fill="none" stroke="#ecdfd8" stroke-width="1.2"/><rect x="1412" y="1112" width="776" height="316" rx="158" fill="none" stroke="#ecdfd8" stroke-width="1.2"/><rect x="1423" y="1123" width="754" height="294" rx="147" fill="none" stroke="#ecdfd8" stroke-width="1.2"/>';
+  s += '<rect x="1434" y="1134" width="732" height="272" rx="136" fill="#b9c9a6" stroke="#ecdfd8" stroke-width="2"/><g clip-path="url(#infield)">';
+  for (let x = 1434; x < 2170; x += 122) s += `<rect x="${x}" y="1134" width="61" height="272" fill="#b1c29e"/>`;
+  s += '</g><rect x="1590" y="1180" width="420" height="180" fill="none" stroke="#f1eee6" stroke-width="2"/><path d="M1800,1180 V1360 M1590,1235 H1625 V1305 H1590 M2010,1235 H1975 V1305 H2010" fill="none" stroke="#f1eee6" stroke-width="2"/><circle cx="1800" cy="1270" r="34" fill="none" stroke="#f1eee6" stroke-width="2"/>';
+
+  // 外壁と正門
+  const wallD = 'M1168,1500 H140 V140 H2260 V1500 H1232';
+  s += `<path d="${wallD}" fill="none" stroke="#9c958a" stroke-width="10"/><path d="${wallD}" fill="none" stroke="#d6d0c3" stroke-width="6.5"/>`;
+  for (const [x, y] of [[140, 140], [2260, 140], [140, 1500], [2260, 1500], [1200, 140], [140, 820], [2260, 820], [670, 140], [1730, 140], [670, 1500], [1730, 1500], [1166, 1500], [1234, 1500]])
+    s += `<circle cx="${x}" cy="${y}" r="14" fill="#d6d0c3" stroke="#9c958a" stroke-width="2"/>`;
+  s += '<path d="M1180,1500 H1220" stroke="#55504a" stroke-width="2.5" stroke-dasharray="4 4"/>';
+
+  // 生垣
+  const hedge = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#a3b89c" stroke="#8aa283" stroke-width="1.2"/>`;
+  s += hedge(900, 776, 220, 12) + hedge(1280, 776, 220, 12);
+
+  // 本館の中庭と回廊
+  s += '<rect x="970" y="390" width="460" height="220" fill="#ece5d3"/>';
+  s += '<rect x="996" y="416" width="408" height="168" fill="#c8d3b6" stroke="#b5ad9e" stroke-width="1.2"/>';
+  s += '<rect x="996" y="416" width="408" height="168" fill="none" stroke="#55504a" stroke-width="4.5" stroke-dasharray="0.1 20.3" stroke-linecap="round"/>';
+  s += '<path d="M1200,416 V584 M996,500 H1404" stroke="#ece5d3" stroke-width="14"/>';
+  s += `<circle cx="1200" cy="500" r="24" fill="#ece5d3"/><circle cx="1200" cy="500" r="16" ${WATER}/><circle cx="1200" cy="500" r="4" ${STONE}/>`;
+  s += '<rect x="1160" y="758" width="80" height="6" fill="#e6dfcf" stroke="#b5ad9e" stroke-width="1"/><rect x="1152" y="765" width="96" height="6" fill="#e6dfcf" stroke="#b5ad9e" stroke-width="1"/>';
+
+  // 木
+  const T = [
+    [1150,990],[1150,1060],[1150,1130],[1150,1200],[1150,1270],[1150,1340],[1150,1410],[1250,990],[1250,1060],[1250,1130],[1250,1200],[1250,1270],[1250,1340],[1250,1410],
+    [615,240],[692,212],[765,250],[625,325],[770,335],[770,425],[625,470],[770,580],[765,670],[770,775],[610,650],[600,760],
+    [240,185],[340,180],[440,186],[540,180],[240,630],[330,632],[420,628],[510,632],[230,1085],[320,1090],[410,1084],[500,1090],[585,1085],
+    [262,1162],[538,1162],[262,1438],[538,1438],[590,1420],[205,1300],
+    [905,182],[985,178],[1065,182],[1335,182],[1415,178],[1495,182],
+    [1632,205],[1640,295],[1628,385],[1725,192],[1805,186],[1885,192],[1962,184],
+    [2200,560],[2085,580],[2180,665],[2075,690],[2095,785],[2175,845],[2090,905],[2185,965],[2100,1020],
+    [1325,1165],[1330,1300],[1320,1425],[1720,1045],[1830,1035],[1940,1045],[760,1010],[1100,930]
+  ];
+  T.forEach(([x, y], i) => s += `<use href="#${i % 3 === 1 ? 't2' : 't'}" x="${x}" y="${y}"/>`);
+  for (const y of [1240, 1310, 1380]) for (const x of [770, 840, 910, 980, 1050]) s += `<use href="#ts" x="${x}" y="${y}"/>`;
+  for (const [x, y] of [[350,442],[520,442],[350,902],[520,902],[1040,455],[1360,455],[1040,548],[1360,548]]) s += `<use href="#ts" x="${x}" y="${y}"/>`;
+  $('ground').innerHTML = s;
+})();
+
+/* =====================================================================
+   間取りを組み立てる道具
+   縮尺の目安:10 = 1m(廊下の幅 2〜2.4m、教室 約10m角、寮室 4.5×8m)
+   ===================================================================== */
+const FLOORC = '#f1ead9';
+const WOOD = 'fill="#d9ccb2" stroke="#a39478" stroke-width="1"';
+const LINE = 'fill="none" stroke="#8d867c" stroke-width="1"';
+const Plan = (foot, fill) => ({ foot, fill: fill || FLOORC, w: '', d: '', l: '', f: '', top: '' });
+const wl = (P, d) => { P.w += d + ' '; };
+const door = (P, x, y, dir, len = 14) => { P.d += dir === 'h' ? `M${x - len / 2},${y} H${x + len / 2} ` : `M${x},${y - len / 2} V${y + len / 2} `; };
+const lab = (P, x, y, t) => { P.l += `<text class="rl" x="${x}" y="${y + 3.2}">${t}</text>`; };
+const render = P => `<path d="${P.foot}" fill="${P.fill}" fill-rule="evenodd" class="wall"/>${P.f}<path class="part" d="${P.w}"/><path class="door" stroke="${P.fill}" d="${P.d}"/>${P.top}${P.l}`;
+
+// 横に並ぶ部屋の列(廊下側の壁の y が doorY)
+function hrow(P, y0, y1, xs, rooms, doorY) {
+  const out = [];
+  for (let i = 1; i < xs.length - 1; i++) wl(P, `M${xs[i]},${y0} V${y1}`);
+  rooms.forEach((r, i) => {
+    const a = xs[i], b = xs[i + 1], cx = (a + b) / 2, cy = (y0 + y1) / 2;
+    if (r.f) P.f += r.f(a, y0, b, y1);
+    if (r.t) lab(P, cx, cy + (r.dy || 0), r.t);
+    if (r.open) door(P, cx, doorY, 'h', b - a - 6);
+    else if (r.door !== false) (r.doors || [cx]).forEach(x => door(P, x, doorY, 'h'));
+    out.push({ cx, cy, r });
+  });
+  return out;
+}
+// 縦に並ぶ部屋の列(廊下側の壁の x が doorX)
+function vrow(P, x0, x1, ys, rooms, doorX) {
+  const out = [];
+  for (let i = 1; i < ys.length - 1; i++) wl(P, `M${x0},${ys[i]} H${x1}`);
+  rooms.forEach((r, i) => {
+    const a = ys[i], b = ys[i + 1], cx = (x0 + x1) / 2, cy = (a + b) / 2;
+    if (r.f) P.f += r.f(x0, a, x1, b);
+    if (r.t) lab(P, cx, cy + (r.dy || 0), r.t);
+    if (r.open) door(P, doorX, cy, 'v', b - a - 6);
+    else if (r.door !== false) (r.doors || [cy]).forEach(y => door(P, doorX, y, 'v'));
+    out.push({ cx, cy, r });
+  });
+  return out;
+}
+
+/* ---------- 家具 ---------- */
+const F = {
+  desks: (a, y0, b, y1) => { let s = `<rect x="${(a + b) / 2 - 13}" y="${y0 + 9}" width="26" height="7" ${WOOD}/>`; for (let y = y0 + 28; y < y1 - 12; y += 17) for (let x = a + 12; x + 14 < b - 8; x += 22) s += `<rect x="${x}" y="${y}" width="14" height="6" ${WOOD}/>`; return s; },
+  desksV: (a, y0, b, y1) => { let s = `<rect x="${a + 9}" y="${(y0 + y1) / 2 - 13}" width="7" height="26" ${WOOD}/>`; for (let x = a + 28; x < b - 12; x += 17) for (let y = y0 + 12; y + 14 < y1 - 8; y += 22) s += `<rect x="${x}" y="${y}" width="6" height="14" ${WOOD}/>`; return s; },
+  stairs: (a, y0, b, y1) => { const x = a + 12, w = b - a - 24, y = y0 + 12, h = Math.min(46, (y1 - y0) * .45); let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${LINE}/><path d="M${x},${y + h / 2} H${x + w}" ${LINE}/>`; for (let i = x + 6; i < x + w - 1; i += 6) s += `<path d="M${i},${y} V${y + h}" ${LINE} stroke-width=".8"/>`; return s; },
+  shelves: (a, y0, b, y1) => { let s = ''; for (let y = y0 + 14; y + 5 < y1 - 10; y += 17) s += `<rect x="${a + 10}" y="${y}" width="${(b - a) * .55}" height="5" ${WOOD}/>`; return s + `<rect x="${b - 28}" y="${y0 + 20}" width="12" height="${y1 - y0 - 40}" ${WOOD}/>`; },
+  shelvesH: (a, y0, b, y1) => { let s = ''; for (let x = a + 12; x + 5 < b - 10; x += 16) s += `<rect x="${x}" y="${y0 + 10}" width="5" height="${(y1 - y0) * .5}" ${WOOD}/>`; return s; },
+  office: (a, y0, b, y1) => `<rect x="${(a + b) / 2 - 16}" y="${(y0 + y1) / 2 + 12}" width="32" height="10" ${WOOD}/><rect x="${a + 7}" y="${y0 + 7}" width="${b - a - 14}" height="6" ${WOOD}/>`,
+  lounge: (a, y0, b, y1) => { const cx = (a + b) / 2, cy = (y0 + y1) / 2; return `<rect x="${cx - 26}" y="${cy + 12}" width="18" height="8" rx="2" ${WOOD}/><rect x="${cx + 8}" y="${cy + 12}" width="18" height="8" rx="2" ${WOOD}/><circle cx="${cx}" cy="${cy + 24}" r="6" ${WOOD}/><rect x="${cx - 9}" y="${y0 + 3}" width="18" height="5" fill="#9c8f78"/>`; },
+  loungeV: (a, y0, b, y1) => { const cx = (a + b) / 2, cy = (y0 + y1) / 2; return `<rect x="${a + 3}" y="${cy - 10}" width="5" height="20" fill="#9c8f78"/><rect x="${cx - 22}" y="${cy - 44}" width="9" height="22" rx="2" ${WOOD}/><rect x="${cx + 8}" y="${cy - 44}" width="9" height="22" rx="2" ${WOOD}/><circle cx="${cx - 3}" cy="${cy - 33}" r="6" ${WOOD}/><rect x="${cx - 22}" y="${cy + 26}" width="40" height="10" ${WOOD}/><circle cx="${cx - 3}" cy="${cy + 50}" r="8" ${WOOD}/>`; },
+  wc: (a, y0, b, y1) => { let s = ''; for (let x = a + 10; x + 12 < b - 4; x += 16) s += `<rect x="${x}" y="${y1 - 22}" width="12" height="18" ${LINE}/>`; return s; },
+  store: (a, y0, b, y1) => `<rect x="${a + 6}" y="${y0 + 6}" width="${b - a - 12}" height="7" ${WOOD}/><rect x="${a + 6}" y="${y1 - 13}" width="${b - a - 12}" height="7" ${WOOD}/>`,
+  cauldrons: (a, y0, b, y1) => { let s = ''; for (let y = y0 + 22; y < y1 - 14; y += 26) for (let x = a + 22; x < b - 16; x += 30) s += `<circle cx="${x}" cy="${y}" r="7" fill="#c9cfc4" stroke="#8d867c" stroke-width="1.2"/>`; return s; },
+  round: (a, y0, b, y1) => `<circle cx="${(a + b) / 2}" cy="${(y0 + y1) / 2 + 16}" r="16" ${WOOD}/>`,
+  hall: () => { let s = `<rect x="1160" y="207" width="80" height="14" ${WOOD}/>`; for (let y = 262; y <= 348; y += 14) s += `<rect x="1076" y="${y}" width="108" height="5" ${WOOD}/><rect x="1216" y="${y}" width="108" height="5" ${WOOD}/>`; return s; },
+  voidRoom: (a, y0, b, y1) => `<rect x="${a + 8}" y="${y0 + 8}" width="${b - a - 16}" height="${y1 - y0 - 16}" fill="#e4dccb" stroke="#8d867c" stroke-width="1" stroke-dasharray="5 4"/><path d="M${a + 8},${y0 + 8} L${b - 8},${y1 - 8} M${b - 8},${y0 + 8} L${a + 8},${y1 - 8}" stroke="#cfc6b3" stroke-width="1"/>`,
+  bed: blanket => ({
+    n: (a, y0, b) => `<rect x="${a + 5}" y="${y0 + 5}" width="11" height="24" fill="#f8f5ee" stroke="#a39478" stroke-width="1"/><rect x="${a + 5}" y="${y0 + 13}" width="11" height="16" fill="${blanket}" stroke="#a39478" stroke-width="1"/><rect x="${b - 19}" y="${y0 + 5}" width="14" height="7" ${WOOD}/>`,
+    s: (a, y0, b, y1) => `<rect x="${a + 5}" y="${y1 - 29}" width="11" height="24" fill="#f8f5ee" stroke="#a39478" stroke-width="1"/><rect x="${a + 5}" y="${y1 - 29}" width="11" height="16" fill="${blanket}" stroke="#a39478" stroke-width="1"/><rect x="${b - 19}" y="${y1 - 12}" width="14" height="7" ${WOOD}/>`,
+    w: (a, y0, b, y1) => `<rect x="${a + 5}" y="${y0 + 5}" width="24" height="11" fill="#f8f5ee" stroke="#a39478" stroke-width="1"/><rect x="${a + 13}" y="${y0 + 5}" width="16" height="11" fill="${blanket}" stroke="#a39478" stroke-width="1"/><rect x="${a + 5}" y="${y1 - 19}" width="7" height="14" ${WOOD}/>`
+  })
+};
+
+/* =====================================================================
+   ① 本館(3階建て)
+   中庭を囲むロの字型。中庭側に廊下、外側に部屋が並ぶ。
+   ===================================================================== */
+const G = { main: {}, dorm: {} }; // 各階の扉位置(歩行ルート用)
+function mainFloor(L) {
+  const P = Plan(L === 1 ? FOOT.main : FOOT.mainUp);
+  wl(P, 'M840,366 H1560 M840,634 H1560 M946,390 V610 M1454,390 V610 M840,390 H946 M1454,390 H1560 M840,610 H946 M1454,610 H1560');
+  const st = { t: '階段', dy: 26, f: F.stairs };
+  const north = {
+    1: [st, { t: '講義室', f: F.desks }, { t: '大講堂', dy: -56, doors: [1100, 1300], f: F.hall }, { t: '講義室', f: F.desks }, st],
+    2: [st, { t: '音楽室', f: F.round }, { t: '大講堂 上部(吹き抜け)', door: false, f: F.voidRoom }, { t: '美術室', f: F.round }, st],
+    3: [st, { t: '占星術室', f: F.round }, { t: '吹き抜け', door: false, f: F.voidRoom }, { t: '天文学教室', f: F.desks }, st]
+  }[L];
+  const south = {
+    1: [{ t: '化粧室', f: F.wc }, { t: '職員室', f: F.office }, { t: '事務室', f: F.office }, { t: '玄関ホール', open: true, dy: 14 }, { t: '守衛室', f: F.office }, { t: '談話室', f: F.lounge }, { t: '化粧室', f: F.wc }],
+    2: [{ t: '化粧室', f: F.wc }, { t: '教室', f: F.desks }, { t: '応接室', f: F.lounge }, { t: '学園長室', f: F.office }, { t: '秘書室', f: F.office }, { t: '教員談話室', f: F.lounge }, { t: '化粧室', f: F.wc }],
+    3: [{ t: '倉庫', f: F.store }, { t: '教室', f: F.desks }, { t: '資料室', f: F.shelvesH }, { t: '会議室', f: F.round }, { t: '生徒会室', f: F.office }, { t: '自習室', f: F.desks }, { t: '倉庫', f: F.store }]
+  }[L];
+  const n = hrow(P, 240, 366, [840, 946, 1050, 1350, 1454, 1560], north, 366);
+  const s = hrow(P, 634, 720, [840, 924, 1034, 1124, 1276, 1350, 1476, 1560], south, 634);
+  let w, e;
+  if (L === 1) {
+    w = vrow(P, 840, 946, [390, 488, 512, 610], [{ t: '教室', f: F.desksV }, { open: true }, { t: '教室', f: F.desksV }], 946);
+    e = vrow(P, 1454, 1560, [390, 488, 512, 610], [{ t: '教室', f: F.desksV }, { open: true }, { t: '教室', f: F.desksV }], 1454);
+    door(P, 840, 500, 'v', 18); door(P, 1560, 500, 'v', 18);
+    door(P, 1200, 390, 'h', 20); door(P, 1200, 610, 'h', 20); door(P, 970, 500, 'v', 20); door(P, 1430, 500, 'v', 20);
+    door(P, 1200, 756, 'h', 34);
+  } else if (L === 2) {
+    w = vrow(P, 840, 946, [390, 500, 610], [{ t: '魔法薬学教室', f: F.desksV }, { t: '教室', f: F.desksV }], 946);
+    e = vrow(P, 1454, 1560, [390, 520, 610], [{ t: '錬金術室', f: F.cauldrons }, { t: '準備室', f: F.store }], 1454);
+  } else {
+    w = vrow(P, 840, 946, [390, 500, 610], [{ t: '魔法生物学教室', f: F.desksV }, { t: '教室', f: F.desksV }], 946);
+    e = vrow(P, 1454, 1560, [390, 500, 610], [{ t: '魔法史教室', f: F.desksV }, { t: '教室', f: F.desksV }], 1454);
+  }
+  G.main[L] = { n, s, w, e };
+  return render(P);
+}
+
+/* =====================================================================
+   ③④ 寮(3階建て)
+   コの字型。中庭側に廊下、外側に寮室。
+   ===================================================================== */
+function dormFloor(L, fill, blanket) {
+  const P = Plan(FOOT.dorm, fill), B = F.bed(blanket);
+  wl(P, 'M190,310 H570 M190,490 H570 M280,330 V470 M190,330 H280 M190,470 H280');
+  const st = { t: '階段', dy: 24, f: F.stairs }, rn = { t: '寮室', dy: 12, f: B.n }, rs = { t: '寮室', dy: -12, f: B.s };
+  const n = hrow(P, 230, 310, [190, 250, 300, 345, 390, 435, 480, 525, 570], [st, L === 1 ? { t: '寮監室', f: F.office } : { t: '給湯室', f: F.store }, rn, rn, rn, rn, rn, rn], 310);
+  const s = L === 1
+    ? hrow(P, 490, 570, [190, 250, 320, 380, 480, 525, 570], [st, { t: '浴室', f: F.wc }, { t: '洗濯室', f: F.store }, { t: '自習室', f: F.desks }, rs, rs], 490)
+    : hrow(P, 490, 570, [190, 250, 320, 370, 420, 470, 520, 570], [st, { t: '浴室', f: F.wc }, rs, rs, rs, rs, rs], 490);
+  let v;
+  if (L === 1) { v = vrow(P, 190, 280, [330, 470], [{ t: '談話室', f: F.loungeV }], 280); door(P, 300, 400, 'v', 18); }
+  else if (L === 2) v = vrow(P, 190, 280, [330, 377, 423, 470], [{ t: '寮室', f: B.w }, { t: '寮室', f: B.w }, { t: '寮室', f: B.w }], 280);
+  else v = vrow(P, 190, 280, [330, 400, 470], [{ t: '図書コーナー', f: F.shelves }, { t: '寮監居室', f: B.w }], 280);
+  G.dorm[L] = { n, s, v };
+  return render(P).replace(/class="rl"/g, `class="rl" style="stroke:${fill}"`);
+}
+
+/* =====================================================================
+   ⑥ 食堂 / ② 体育館 / ⑦ 温室(平屋)
+   ===================================================================== */
+function diningFloor() {
+  // 英国カレッジのホール:入口の通路(スクリーンズ・パッセージ)をはさんで、片側が厨房、反対側が大広間。奥に上座(ハイテーブル)。
+  const P = Plan(FOOT.dining);
+  wl(P, 'M830,960 V1160 M856,960 V1160 M720,1090 H830');
+  door(P, 843, 960, 'h', 18); door(P, 843, 1160, 'h', 18);
+  door(P, 830, 1033, 'v'); door(P, 830, 1120, 'v'); door(P, 856, 1033, 'v', 20); door(P, 856, 1087, 'v', 20);
+  P.f += '<rect x="1028" y="962" width="50" height="196" fill="#e4dccb"/><path d="M1028,962 V1158" stroke="#b5ad9e" stroke-width="1"/>';
+  P.f += `<rect x="1046" y="1000" width="12" height="120" ${WOOD}/><rect x="1064" y="1004" width="5" height="112" ${WOOD}/>`;
+  for (const y of [1000, 1054, 1108]) P.f += `<rect x="880" y="${y}" width="132" height="12" ${WOOD}/><rect x="884" y="${y - 8}" width="124" height="4" ${WOOD}/><rect x="884" y="${y + 16}" width="124" height="4" ${WOOD}/>`;
+  P.f += '<rect x="930" y="962" width="30" height="5" fill="#9c8f78"/>';
+  P.f += `<rect x="726" y="968" width="60" height="12" fill="#d5d2cb" stroke="#8d867c" stroke-width="1"/><circle cx="740" cy="974" r="3.5" fill="#55504a"/><circle cx="756" cy="974" r="3.5" fill="#55504a"/><circle cx="772" cy="974" r="3.5" fill="#55504a"/>`;
+  P.f += `<rect x="752" y="1030" width="46" height="18" ${WOOD}/><rect x="726" y="1100" width="8" height="52" ${WOOD}/><rect x="744" y="1144" width="70" height="8" ${WOOD}/>`;
+  lab(P, 775, 1008, '厨房'); lab(P, 780, 1122, '配膳室'); lab(P, 912, 978, '大広間'); lab(P, 1053, 978, '上座');
+  return render(P);
+}
+function gymFloor() {
+  const P = Plan(FOOT.gym);
+  wl(P, 'M1750,740 V980 M1970,740 V980 M1680,820 H1750 M1680,900 H1750 M1970,860 H2020');
+  door(P, 1680, 860, 'v', 24); door(P, 1750, 860, 'v', 24);
+  door(P, 1715, 820, 'h'); door(P, 1715, 900, 'h'); door(P, 1970, 800, 'v'); door(P, 1970, 920, 'v');
+  P.f += '<rect x="1766" y="756" width="188" height="208" fill="#e6dcc3" stroke="#b5a98c" stroke-width="1.5"/><path d="M1766,860 H1954" stroke="#f8f5ee" stroke-width="2"/><circle cx="1860" cy="860" r="26" fill="none" stroke="#f8f5ee" stroke-width="2"/>';
+  P.f += '<path d="M1826,756 V790 H1894 V756 M1826,964 V930 H1894 V964" fill="none" stroke="#f8f5ee" stroke-width="2"/>';
+  P.f += `<rect x="1686" y="746" width="58" height="6" ${WOOD}/><rect x="1686" y="968" width="58" height="6" ${WOOD}/><rect x="2004" y="746" width="10" height="100" ${WOOD}/><rect x="1984" y="950" width="30" height="10" ${WOOD}/>`;
+  lab(P, 1715, 782, '男子更衣室'); lab(P, 1715, 938, '女子更衣室'); lab(P, 1715, 845, 'ロビー'); lab(P, 1992, 772, '用具庫'); lab(P, 1995, 900, '教官室'); lab(P, 1860, 946, 'アリーナ');
+  return render(P);
+}
+function greenFloor() {
+  const P = Plan(FOOT.green, '#e9eee6');
+  door(P, 1820, 410, 'h', 22);
+  const bed = (x, y, w, h) => { let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#b9c4a6" stroke="#93a087" stroke-width="1.2"/>`; for (let i = x + 10; i < x + w - 4; i += 14) s += `<circle cx="${i}" cy="${y + h / 2}" r="3.5" fill="#93a887"/>`; return s; };
+  P.f += bed(1712, 262, 216, 20) + bed(1712, 378, 84, 20) + bed(1844, 378, 84, 20) + bed(1730, 312, 70, 36) + bed(1840, 312, 70, 36);
+  lab(P, 1765, 302, '育苗棚'); lab(P, 1875, 302, '薬草棚');
+  return render(P).replace(/class="rl"/g, 'class="rl" style="stroke:#e9eee6"').replace('class="wall"', 'stroke="#7f968c" stroke-width="4"');
+}
+
+/* =====================================================================
+   ⑧ 図書館(2階建て)
+   1階は貸出カウンターと閲覧室(壁際に書架の小間)、2階は書庫と自習席。
+   ===================================================================== */
+function libFloor(L) {
+  const P = Plan(FOOT.lib);
+  wl(P, 'M1350,895 V1065 M1290,975 H1350');
+  door(P, 1350, 935, 'v'); door(P, 1350, 1020, 'v');
+  P.f += F.stairs(1290, 895, 1350, 975);
+  lab(P, 1320, 958, '階段');
+  if (L === 1) {
+    door(P, 1430, 895, 'h', 24);
+    P.f += `<rect x="1362" y="903" width="46" height="9" ${WOOD}/><rect x="1375" y="972" width="80" height="12" ${WOOD}/><rect x="1475" y="972" width="80" height="12" ${WOOD}/>`;
+    for (let x = 1372; x <= 1556; x += 23) P.f += `<rect x="${x}" y="1022" width="5" height="40" ${WOOD}/>`;
+    P.f += `<rect x="1296" y="1048" width="48" height="8" ${WOOD}/><rect x="1304" y="1000" width="26" height="9" ${WOOD}/>`;
+    lab(P, 1385, 922, '貸出'); lab(P, 1465, 950, '閲覧室'); lab(P, 1320, 1030, '司書室');
+  } else {
+    for (let x = 1378; x <= 1524; x += 24) P.f += `<rect x="${x}" y="903" width="6" height="60" ${WOOD}/><rect x="${x}" y="997" width="6" height="60" ${WOOD}/>`;
+    for (let y = 948; y <= 1040; y += 23) P.f += `<rect x="1554" y="${y}" width="10" height="14" ${WOOD}/>`;
+    P.f += `<rect x="1296" y="983" width="8" height="74" ${WOOD}/><rect x="1318" y="1046" width="26" height="9" ${WOOD}/>`;
+    lab(P, 1450, 980, '書庫'); lab(P, 1325, 1018, '稀覯書室');
+  }
+  return render(P);
+}
+
+/* =====================================================================
+   屋根
+   ===================================================================== */
+const SH = { n: '#8e97a6', w: '#868f9f', e: '#788191', s: '#707989' };
+const poly = (pts, dir) => `<polygon points="${pts.map(q => q.join(',')).join(' ')}" fill="${SH[dir]}" stroke="#5d6573" stroke-width=".8"/>`;
+const outline = d => `<path d="${d}" fill="none" stroke="#4e5666" stroke-width="3" stroke-linejoin="miter"/>`;
+const chimney = (x, y) => `<rect x="${x - 6}" y="${y - 6}" width="12" height="12" fill="#a8998c" stroke="#6f655c" stroke-width="1.5"/>`;
+function hipRect(x, y, w, h) {
+  const k = Math.min(w, h) / 2;
+  return poly([[x, y], [x + w, y], [x + w - k, y + k], [x + k, y + k]], 'n') + poly([[x, y + h], [x + w, y + h], [x + w - k, y + h - k], [x + k, y + h - k]], 's') +
+         poly([[x, y], [x + k, y + k], [x + k, y + h - k], [x, y + h]], 'w') + poly([[x + w, y], [x + w - k, y + k], [x + w - k, y + h - k], [x + w, y + h]], 'e');
+}
+function dormRoof() {
+  return poly([[190,230],[570,230],[520,280],[245,280]], 'n') + poly([[300,330],[570,330],[520,280],[245,280]], 's') + poly([[570,230],[570,330],[520,280]], 'e') +
+    poly([[190,230],[245,280],[245,520],[190,570]], 'w') + poly([[300,330],[245,280],[245,520],[300,470]], 'e') +
+    poly([[300,470],[570,470],[520,520],[245,520]], 'n') + poly([[190,570],[570,570],[520,520],[245,520]], 's') + poly([[570,470],[570,570],[520,520]], 'e') +
+    outline(FOOT.dorm) + chimney(245, 400) + chimney(410, 280) + chimney(410, 520);
+}
+const mainRoof =
+  poly([[840,240],[1560,240],[1495,315],[905,315]], 'n') + poly([[970,390],[1430,390],[1495,315],[905,315]], 's') +
+  poly([[840,240],[905,315],[905,665],[840,720]], 'w') + poly([[970,390],[905,315],[905,665],[970,610]], 'e') +
+  poly([[970,610],[1430,610],[1495,665],[905,665]], 'n') + poly([[840,720],[1560,720],[1495,665],[905,665]], 's') +
+  poly([[1430,390],[1495,315],[1495,665],[1430,610]], 'w') + poly([[1560,240],[1495,315],[1495,665],[1560,720]], 'e') +
+  poly([[1120,240],[1150,200],[1200,246]], 'w') + poly([[1150,200],[1250,200],[1200,246]], 'n') + poly([[1250,200],[1280,240],[1200,246]], 'e') +
+  poly([[1150,716],[1200,716],[1200,756],[1150,756]], 'w') + poly([[1250,716],[1200,716],[1200,756],[1250,756]], 'e') +
+  outline(FOOT.main) + hipRect(1181, 296, 38, 38) + '<rect x="1181" y="296" width="38" height="38" fill="none" stroke="#4e5666" stroke-width="2"/>' +
+  chimney(1010, 315) + chimney(1390, 315) + chimney(905, 500) + chimney(1495, 500) + chimney(1040, 665) + chimney(1360, 665);
+const BUILDINGS = [
+  { id: 'main', n: 1, name: '本館', badge: [1200, 452], rects: [[840, 200, 720, 190], [840, 610, 720, 146], [840, 390, 130, 220], [1430, 390, 130, 220]],
+    floors: [mainFloor(1), mainFloor(2), mainFloor(3)], roof: mainRoof },
+  { id: 'gym', n: 2, name: '体育館', badge: [1860, 860], rects: [[1680, 740, 340, 240]],
+    floors: [gymFloor()], roof: hipRect(1680, 740, 340, 240) + outline(FOOT.gym) },
+  { id: 'dorm1', n: 3, name: '寮1', badge: [435, 365], rects: [[190, 230, 380, 100], [190, 330, 110, 140], [190, 470, 380, 100]],
+    floors: [1, 2, 3].map(L => dormFloor(L, '#f1ead9', '#d3b5ae')), roof: dormRoof() },
+  { id: 'dorm2', n: 4, name: '寮2', badge: [435, 825], shift: 460, rects: [[190, 690, 380, 100], [190, 790, 110, 140], [190, 930, 380, 100]],
+    floors: [1, 2, 3].map(L => dormFloor(L, '#efebdf', '#aebccc')), roof: dormRoof() },
+  { id: 'dining', n: 6, name: '食堂', badge: [985, 978], rects: [[720, 960, 360, 200]],
+    floors: [diningFloor()], roof: hipRect(720, 960, 360, 200) + outline(FOOT.dining) + chimney(745, 1105) + chimney(945, 975) },
+  { id: 'green', n: 7, name: '温室', badge: [1820, 330], rects: [[1690, 250, 260, 160]],
+    floors: [greenFloor()],
+    roof: `<path d="${FOOT.green}" fill="#d3e0db" stroke="#7f968c" stroke-width="3" stroke-linejoin="miter"/>
+      <path d="M1708,250 L1740,330 L1708,410 M1932,250 L1900,330 L1932,410 M1740,330 H1900 M1772,252 V408 M1804,252 V408 M1836,252 V408 M1868,252 V408 M1740,252 V408 M1900,252 V408 M1692,290 H1948 M1692,370 H1948" fill="none" stroke="#f3f7f5" stroke-width="1.3"/>` }
+];
+BUILDINGS.push({ id: 'lib', n: 8, name: '図書館', badge: [1548, 920], rects: [[1290, 895, 280, 170]],
+  floors: [libFloor(1), libFloor(2)], roof: hipRect(1290, 895, 280, 170) + outline(FOOT.lib) + chimney(1320, 980) });
+const FIELD = { id: 'field', n: 5, name: '運動場', badge: [1800, 1270] };
+const BY_ID = Object.fromEntries(BUILDINGS.map(b => [b.id, b]));
+
+(function buildBuildings() {
+  let iHtml = '', rHtml = '', bHtml = '';
+  for (const b of BUILDINGS) {
+    const t = b.shift ? ` transform="translate(0,${b.shift})"` : '';
+    iHtml += `<g class="interior" data-id="${b.id}"${t}>` + b.floors.map((f, i) => `<g class="floor" data-f="${i + 1}">${f}</g>`).join('') + '</g>';
+    rHtml += `<g${t}><g class="roof open" data-id="${b.id}"><title>${b.name}(クリックで屋根を外す)</title>${b.roof}</g></g>`;
+  }
+  for (const b of [...BUILDINGS, FIELD])
+    bHtml += `<g class="badge" transform="translate(${b.badge[0]},${b.badge[1]})"><circle r="15"/><text y="6">${b.n}</text></g>`;
+  $('interiors').innerHTML = iHtml; $('roofs').innerHTML = rHtml; $('badges').innerHTML = bHtml;
+})();
+
+/* ---------- 屋根の開閉と階の切り替え ---------- */
+let currentFloor = 1;
+const shownFloor = b => Math.min(currentFloor, b.floors.length);
+function setFloor(f) {
+  currentFloor = f;
+  for (const b of BUILDINGS) {
+    const sf = shownFloor(b);
+    document.querySelectorAll(`.interior[data-id="${b.id}"] .floor`).forEach(g => g.classList.toggle('on', +g.dataset.f === sf));
+  }
+  document.querySelectorAll('#floorSeg button').forEach(btn => btn.classList.toggle('on', +btn.dataset.f === f));
+}
+function toggleRoof(id, force) {
+  const el = document.querySelector(`.roof[data-id="${id}"]`);
+  if (el) el.classList.toggle('open', force);
+}
+const setAllRoofs = open => BUILDINGS.forEach(b => toggleRoof(b.id, open));
+
+/* =====================================================================
+   題字・凡例・方位・縮尺
+   ===================================================================== */
+(function buildPanels() {
+  const notch = (x, y, w, h, r) => `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 0 ${x + w},${y + r} V${y + h - r} A${r},${r} 0 0 0 ${x + w - r},${y + h} H${x + r} A${r},${r} 0 0 0 ${x},${y + h - r} V${y + r} A${r},${r} 0 0 0 ${x + r},${y} Z`;
+  let s = '';
+  s += `<path d="${notch(-484, -54, 448, 300, 26)}" fill="#f5f0e4" stroke="#a8a092" stroke-width="2.5"/><path d="${notch(-472, -42, 424, 276, 22)}" fill="none" stroke="#a8a092" stroke-width="1"/>`;
+  s += '<g transform="translate(-260,14)"><path d="M-27,-32 H27 V4 C27,26 0,38 0,38 C0,38 -27,26 -27,4 Z" fill="#6b7588" stroke="#4e4a45" stroke-width="2"/>' +
+       '<path d="M0,-20 L5,-6 L19,-6 L8,3 L12,17 L0,8 L-12,17 L-8,3 L-19,-6 L-5,-6 Z" fill="#f5f0e4"/></g>';
+  s += '<text x="-260" y="106" text-anchor="middle" font-size="40" fill="#4e4a45" style="font-family:Georgia,\'Times New Roman\',serif">St. Alveric Academy</text>';
+  s += '<text x="-260" y="148" text-anchor="middle" font-size="26" font-weight="bold" fill="#4e4a45" letter-spacing="5">聖アルヴェリック学園</text>';
+  s += '<text x="-260" y="190" text-anchor="middle" font-size="24" fill="#7a736a" style="font-family:Georgia,\'Times New Roman\',serif">Campus Map</text>';
+  s += '<path d="M-340,212 H-282 M-238,212 H-180" stroke="#8a8378" stroke-width="1.2"/><path d="M-260,203 l9,9 l-9,9 l-9,-9 Z" fill="#6b7588"/>';
+  // 凡例
+  s += '<rect x="-484" y="290" width="448" height="502" rx="8" fill="#f5f0e4" stroke="#a8a092" stroke-width="2.5"/>';
+  [...BUILDINGS, FIELD].sort((a, b) => a.n - b.n).forEach((b, i) => {
+    const y = 346 + i * 56, sub = b.floors ? (b.floors.length > 1 ? `${b.floors.length}階建て` : '平屋') : '';
+    s += `<g class="legend-row" data-id="${b.id}"><rect x="-470" y="${y - 27}" width="420" height="54" fill="transparent"/><circle cx="-432" cy="${y}" r="20" fill="#4e4a45"/><text x="-432" y="${y + 7.5}" text-anchor="middle" font-size="22" font-weight="bold" fill="#f5f0e4" style="font-family:Georgia,serif">${b.n}</text><text class="legend-name" x="-396" y="${y + 10}">${b.name}</text><text class="legend-sub" x="-70" y="${y + 6}" text-anchor="end">${sub}</text></g>`;
+  });
+  // 縮尺
+  s += '<g transform="translate(-460,856)"><rect x="-24" y="-34" width="448" height="78" rx="8" fill="#f5f0e4" stroke="#a8a092" stroke-width="2.5"/>' +
+       '<rect x="0" y="0" width="100" height="8" fill="#4e4a45"/><rect x="100" y="0" width="100" height="8" fill="#f5f0e4" stroke="#4e4a45" stroke-width="1"/><rect x="200" y="0" width="100" height="8" fill="#4e4a45"/><rect x="0" y="0" width="300" height="8" fill="none" stroke="#4e4a45" stroke-width="1"/>' +
+       '<g font-size="15" fill="#4e4a45" text-anchor="middle" style="font-family:Georgia,serif"><text x="0" y="-8">0</text><text x="100" y="-8">10</text><text x="200" y="-8">20</text><text x="300" y="-8">30 m</text></g></g>';
+  // 方位
+  s += '<g transform="translate(-260,1490) scale(1.7)"><circle r="52" fill="#f5f0e4" stroke="#a8a092" stroke-width="1.5"/><circle r="36" fill="none" stroke="#4e4a45" stroke-width="1"/>' +
+       '<g transform="rotate(45) scale(.62)"><use href="#spike"/><use href="#spike" transform="rotate(90)"/><use href="#spike" transform="rotate(180)"/><use href="#spike" transform="rotate(270)"/></g>' +
+       '<use href="#spike" transform="scale(.82)"/><use href="#spike" transform="rotate(90) scale(.82)"/><use href="#spike" transform="rotate(180) scale(.82)"/><use href="#spike" transform="rotate(270) scale(.82)"/><circle r="3.5" fill="#6b7588"/>' +
+       '<g font-size="11" font-weight="bold" fill="#4e4a45" text-anchor="middle" style="font-family:Georgia,serif"><text y="-41.5">N</text><text y="49">S</text><text x="-45.5" y="4">W</text><text x="45.5" y="4">E</text></g></g>';
+  $('panels').innerHTML = s;
+})();
+
+/* =====================================================================
+   歩行ルート(点と線)。階ごとに点を持ち、階段室で上下の階がつながる。
+   ===================================================================== */
+const N = {};
+function node(id, x, y, stay, f, bld, label) { N[id] = { id, x, y, adj: [], stay: stay || 0, f: f || 1, bld: bld || null, label: label || '' }; }
+function link(...ids) { for (let i = 0; i < ids.length - 1; i++) { N[ids[i]].adj.push(ids[i + 1]); N[ids[i + 1]].adj.push(ids[i]); } }
+function chain(axis, ids) { ids.sort((a, b) => N[a][axis] - N[b][axis]); link(...ids); }
+// 部屋の列から「廊下側の点」と「部屋の中の点」を作り、廊下側の点の id を返す
+function doorNodes(pfx, rows, axis, cc, opt = {}) {
+  const dy = opt.dy || 0, ids = [];
+  rows.forEach((o, i) => {
+    if (o.r.door === false || o.r.open) return;
+    (o.r.doors || [axis === 'h' ? o.cx : o.cy]).forEach((v, j) => {
+      const c = `${pfx}${i}_${j}`, rm = c + 'r';
+      if (axis === 'h') { node(c, v, cc + dy, 0, opt.f, opt.bld); node(rm, v, o.cy + dy, .9, opt.f, opt.bld, o.r.t); }
+      else { node(c, cc, v + dy, 0, opt.f, opt.bld); node(rm, o.cx, v + dy, .9, opt.f, opt.bld, o.r.t); }
+      link(c, rm); ids.push(c);
+    });
+  });
+  return ids;
+}
+
+(function buildRoutes() {
+  // 並木道と広場
+  node('gate', 1200, 1478); node('av2', 1200, 1270); node('av1', 1200, 1060);
+  node('pS', 1200, 925); node('pW', 1135, 860); node('pE', 1265, 860); node('pN', 1200, 795);
+  link('gate', 'av2', 'av1', 'pS', 'pW', 'pN', 'pE', 'pS');
+
+  // ---- 本館(1〜3階)。北側両端の階段室で上下につながる ----
+  for (let L = 1; L <= 3; L++) {
+    const k = s => `m${L}${s}`, g = G.main[L], o = { f: L, bld: 'main' };
+    for (const [s, x, y] of [['NW', 958, 378], ['NE', 1442, 378], ['SW', 958, 622], ['SE', 1442, 622], ['Nw', 852, 378], ['Ne', 1548, 378], ['Sw', 852, 622], ['Se', 1548, 622], ['Nc', 1200, 378], ['Sc', 1200, 622], ['Wc', 958, 500], ['Ec', 1442, 500]])
+      node(k(s), x, y, 0, L, 'main');
+    chain('x', [...doorNodes(k('n'), g.n, 'h', 378, o), k('NW'), k('NE'), k('Nc'), k('Nw'), k('Ne')]);
+    chain('x', [...doorNodes(k('s'), g.s, 'h', 622, o), k('SW'), k('SE'), k('Sc'), k('Sw'), k('Se')]);
+    chain('y', [...doorNodes(k('w'), g.w, 'v', 958, o), k('NW'), k('SW'), k('Wc')]);
+    chain('y', [...doorNodes(k('e'), g.e, 'v', 1442, o), k('NE'), k('SE'), k('Ec')]);
+    if (L > 1) { link(k('n0_0r'), `m${L - 1}n0_0r`); link(k('n4_0r'), `m${L - 1}n4_0r`); }
+  }
+  node('porch', 1200, 745); node('hall', 1200, 680, .5, 1, 'main');
+  link('pN', 'porch', 'hall', 'm1Sc');
+  node('dais', 1200, 246, .8, 1, 'main'); link('m1n2_0r', 'dais', 'm1n2_1r');
+  // 回廊と中庭
+  node('clNW', 983, 403); node('clN', 1200, 403); node('clNE', 1417, 403); node('clE', 1417, 500); node('clSE', 1417, 597); node('clS', 1200, 597); node('clSW', 983, 597); node('clW', 983, 500);
+  link('clNW', 'clN', 'clNE', 'clE', 'clSE', 'clS', 'clSW', 'clW', 'clNW');
+  node('fount', 1200, 470, .7); link('clN', 'fount', 'clS'); link('clW', 'fount', 'clE');
+  link('m1Nc', 'clN'); link('m1Sc', 'clS'); link('m1Wc', 'clW'); link('m1Ec', 'clE');
+
+  // ---- 西側の小道 ----
+  node('wOut', 825, 500); node('pw500', 700, 500); node('pw400', 700, 400); node('pw860', 700, 860); node('pd', 843, 860); node('pw650', 650, 860);
+  link('m1Wc', 'wOut', 'pw500', 'pw400'); link('pw500', 'pw860'); link('pW', 'pd', 'pw860', 'pw650');
+
+  // ---- 寮(1〜3階)。北棟・南棟の西端の階段室で上下につながる ----
+  for (const [p, dy, from, bld] of [['a', 0, 'pw400', 'dorm1'], ['b', 460, 'pw650', 'dorm2']]) {
+    node(p + 'gate', 575, 400 + dy); node(p + 'court', 435, 400 + dy);
+    for (let L = 1; L <= 3; L++) {
+      const k = s => `${p}${L}${s}`, g = G.dorm[L], o = { dy, f: L, bld };
+      node(k('jN'), 290, 320 + dy, 0, L, bld); node(k('jS'), 290, 480 + dy, 0, L, bld);
+      chain('x', [...doorNodes(k('n'), g.n, 'h', 320, o), k('jN')]);
+      chain('x', [...doorNodes(k('s'), g.s, 'h', 480, o), k('jS')]);
+      chain('y', [...doorNodes(k('v'), g.v, 'v', 290, o), k('jN'), k('jS')]);
+      if (L > 1) { link(k('n0_0r'), `${p}${L - 1}n0_0r`); link(k('s0_0r'), `${p}${L - 1}s0_0r`); }
+    }
+    link(from, p + 'gate', p + 'court', p + '1v0_0');
+  }
+
+  // ---- 庭園 ----
+  node('g0', 650, 1300); node('gE', 512, 1300, .3); node('gN', 400, 1188, .3); node('gW', 288, 1300, .5); node('gS', 400, 1412, .3);
+  link('pw650', 'g0', 'gE', 'gN', 'gW', 'gS', 'gE');
+
+  // ---- 食堂 ----
+  node('dnN', 843, 948); node('spA', 843, 1033); node('spB', 843, 1087); node('spC', 843, 1120); node('dnS', 843, 1185);
+  link('pd', 'dnN', 'spA', 'spB', 'spC', 'dnS');
+  node('kit', 775, 1055, .9); node('but', 775, 1128, .9); link('spA', 'kit'); link('spC', 'but');
+  const rowA = ['hA1'], rowB = ['hB1'];
+  node('hA1', 868, 1033); node('hB1', 868, 1087);
+  for (let i = 0; i < 5; i++) { node('sa' + i, 892 + i * 28, 1033, .9); node('sb' + i, 892 + i * 28, 1087, .9); rowA.push('sa' + i); rowB.push('sb' + i); }
+  node('hT', 1036, 1060, .8);
+  link('spA', ...rowA, 'hT'); link('spB', ...rowB, 'hT');
+  node('o1', 1105, 1060); node('o2', 1105, 1275); node('o3', 910, 1275, .8); link('av1', 'o1', 'o2', 'o3', 'dnS');
+
+  // ---- 東側 ----
+  node('eOut', 1575, 500); node('ps500', 1620, 500); node('ghp', 1820, 500); node('ghd', 1820, 420);
+  link('m1Ec', 'eOut', 'ps500', 'ghp', 'ghd');
+  node('gh', 1820, 362); node('ghc', 1820, 297, .6); node('ghL', 1722, 362, .8); node('ghL2', 1722, 297, .8); node('ghR', 1918, 362, .8); node('ghR2', 1918, 297, .8);
+  link('ghd', 'gh', 'ghL', 'ghL2', 'ghc', 'ghR2', 'ghR', 'gh'); link('gh', 'ghc');
+  node('hg', 1820, 614, .9); link('ghp', 'hg'); node('lk1', 1940, 492); node('jetty', 2000, 397, .95); link('ghp', 'lk1', 'jetty');
+  node('ps860', 1620, 860); node('pLib', 1430, 860); link('ps500', 'ps860', 'pLib', 'pE');
+
+  // ---- 図書館(1〜2階) ----
+  node('lbD', 1430, 907, 0, 1, 'lib'); node('lbC', 1430, 950, 0, 1, 'lib'); node('lbW', 1362, 935, 0, 1, 'lib'); node('lbSt', 1318, 935, .2, 1, 'lib');
+  node('lbW2', 1362, 1020, 0, 1, 'lib'); node('lbOf', 1318, 1024, .9, 1, 'lib');
+  node('lbT1', 1415, 997, .9, 1, 'lib'); node('lbT2', 1515, 997, .9, 1, 'lib'); node('lbT3', 1515, 960, .9, 1, 'lib');
+  link('pLib', 'lbD', 'lbC', 'lbW', 'lbSt'); link('lbW', 'lbW2', 'lbOf'); link('lbC', 'lbT1', 'lbT2', 'lbT3', 'lbC');
+  node('lb2St', 1318, 935, .2, 2, 'lib'); node('lb2W', 1362, 935, 0, 2, 'lib'); node('lb2A', 1362, 980, 0, 2, 'lib'); node('lb2B', 1450, 980, .9, 2, 'lib');
+  node('lb2C', 1542, 980, .9, 2, 'lib'); node('lb2D', 1542, 1030, .9, 2, 'lib'); node('lb2W2', 1362, 1020, 0, 2, 'lib'); node('lb2R', 1325, 1030, .9, 2, 'lib');
+  link('lbSt', 'lb2St', 'lb2W', 'lb2A', 'lb2B', 'lb2C', 'lb2D'); link('lb2A', 'lb2W2', 'lb2R');
+
+  // ---- 体育館 ----
+  node('gymD', 1692, 860); node('lob', 1715, 860, .3); node('gymC', 1860, 860, .4); node('chM', 1715, 790, .9); node('chF', 1715, 930, .9);
+  node('gymA', 1800, 800, .7); node('gymB', 1920, 920, .7); node('sd1', 1955, 800); node('sto', 1995, 805, .9); node('sd2', 1955, 920); node('ofc', 1992, 925, .9);
+  link('ps860', 'gymD', 'lob', 'gymC', 'gymA', 'sd1', 'sto'); link('chM', 'lob', 'chF'); link('gymC', 'gymB', 'sd2', 'ofc');
+
+  // ---- 運動場 ----
+  node('ps1080', 1620, 1085); link('ps860', 'ps1080');
+  const tr = [[1620, 1112], [2030, 1112], [2142, 1158], [2188, 1270], [2142, 1382], [2030, 1428], [1570, 1428], [1458, 1382], [1412, 1270], [1458, 1158], [1570, 1112]];
+  tr.forEach(([x, y], i) => node('tr' + i, x, y));
+  link('ps1080', ...tr.map((_, i) => 'tr' + i), 'tr0');
+  node('f1', 1700, 1270, .7); node('f2', 1900, 1270, .7); link('tr0', 'f1', 'f2', 'tr1');
+})();
+
+// 最短経路(階段の上り下りは少し遠回り扱い)
+function route(from, to) {
+  if (from === to) return [];
+  const dist = { [from]: 0 }, prev = {}, done = new Set(), open = [from];
+  while (open.length) {
+    let bi = 0;
+    for (let i = 1; i < open.length; i++) if (dist[open[i]] < dist[open[bi]]) bi = i;
+    const u = open.splice(bi, 1)[0];
+    if (u === to) break;
+    done.add(u);
+    for (const v of N[u].adj) {
+      if (done.has(v)) continue;
+      const a = N[u], b = N[v], d = dist[u] + Math.hypot(a.x - b.x, a.y - b.y) + (a.f !== b.f ? 40 : 0);
+      if (dist[v] === undefined) open.push(v);
+      if (dist[v] === undefined || d < dist[v]) { dist[v] = d; prev[v] = u; }
+    }
+  }
+  if (prev[to] === undefined) return [];
+  const p = [];
+  for (let c = to; c !== from; c = prev[c]) p.unshift(c);
+  return p;
+}
+
+/* =====================================================================
+   時間割と行き先
+   ===================================================================== */
+// [開始(0時からの分), 表示名, 行動の種類]
+const PERIODS = [
+  [0, '就寝', 'sleep'],
+  [6 * 60 + 30, '起床・身支度', 'wake'],
+  [7 * 60 + 30, '朝食', 'meal'],
+  [8 * 60 + 30, '1限', 'class'],
+  [9 * 60 + 30, '2限', 'class'],
+  [10 * 60 + 30, '3限', 'class'],
+  [12 * 60, '昼食', 'meal'],
+  [13 * 60, '4限', 'class2'],
+  [14 * 60, '5限', 'class2'],
+  [15 * 60 + 30, '放課後', 'free'],
+  [18 * 60, '夕食', 'meal'],
+  [19 * 60, '自由時間', 'evening'],
+  [22 * 60 + 30, '就寝', 'sleep']
+];
+const ROAM = new Set(['wake', 'free', 'evening']); // この時間帯は、着いた先でしばらく過ごしたら次の場所へ移る
+const periodAt = m => { let i = 0; PERIODS.forEach((p, j) => { if (m >= p[0]) i = j; }); return i; };
+
+// 通学の人:8:00 に正門から登校、17:30 に正門へ向かい、18:00〜翌 8:00 は帰宅(非表示)
+const COMMUTE_IN = 8 * 60, COMMUTE_LEAVE = 17 * 60 + 30, COMMUTE_OUT = 18 * 60;
+const commuteState = m => (m < COMMUTE_IN || m >= COMMUTE_OUT) ? 'away' : m >= COMMUTE_LEAVE ? 'leaving' : 'here';
+
+const ids = fn => Object.values(N).filter(fn).map(n => n.id);
+const POOL = {
+  class: ids(n => n.bld === 'main' && /教室|講義室|大講堂|音楽室|美術室|錬金術室|占星術室/.test(n.label)),
+  pe: ['gymC', 'gymA', 'gymB', 'f1', 'f2', 'tr3', 'tr8', 'ghc', 'ghL', 'ghR'],
+  meal: ids(n => /^s[ab]\d$/.test(n.id)).concat('hT'),
+  lib: ['lbT1', 'lbT2', 'lbT3', 'lb2B', 'lb2C', 'lb2D', 'lb2R'],
+  free: ['gN', 'gW', 'gS', 'jetty', 'f1', 'f2', 'tr2', 'tr6', 'gymA', 'gymB', 'fount', 'pS', 'o3', 'hg', 'ghc', 'clN', 'clS']
+    .concat(ids(n => n.bld === 'main' && /談話室|自習室|生徒会室/.test(n.label))),
+  home: { dorm1: ids(n => n.bld === 'dorm1' && n.label === '寮室'), dorm2: ids(n => n.bld === 'dorm2' && n.label === '寮室') },
+  common: { dorm1: ids(n => n.bld === 'dorm1' && /談話室|自習室|給湯室|図書コーナー|洗濯室/.test(n.label)), dorm2: ids(n => n.bld === 'dorm2' && /談話室|自習室|給湯室|図書コーナー|洗濯室/.test(n.label)) }
+};
+const pickOne = a => a[Math.floor(Math.random() * a.length)];
+
+// [ゲーム内で進む分 / 現実の1秒, 歩く速さの倍率]
+const SPEEDS = { 0: [0, 0], 1: [0.5, 1], 2: [2, 1.6], 3: [10, 3.2] };
+let gameMin = 8 * 60 + 30, speedKey = 1, curPeriod = periodAt(gameMin), curCommute = commuteState(gameMin);
+
+/* =====================================================================
+   キャラクター(身長 約2m相当)
+   ===================================================================== */
+const SVGNS = 'http://www.w3.org/2000/svg';
+const CHAR_SCALE = 0.56;
+const FIGURE = `<line class="lL" x1="-3.2" y1="-10" x2="-3.2" y2="0" stroke="#111" stroke-width="5.2" stroke-linecap="round"/>
+  <line class="lR" x1="3.2" y1="-10" x2="3.2" y2="0" stroke="#111" stroke-width="5.2" stroke-linecap="round"/>
+  <line class="aL" x1="-7.5" y1="-21" x2="-10.5" y2="-12" stroke="#111" stroke-width="3.8" stroke-linecap="round"/>
+  <line class="aR" x1="7.5" y1="-21" x2="10.5" y2="-12" stroke="#111" stroke-width="3.8" stroke-linecap="round"/>
+  <path d="M-7,-22.5 Q0,-26 7,-22.5 L6,-9.5 Q0,-7.5 -6,-9.5 Z" fill="#111"/>
+  <circle cx="0" cy="-32" r="9" fill="#111"/>`;
+let walkers = [];
+
+function buildingAt(x, y) {
+  for (const b of BUILDINGS) for (const [rx, ry, rw, rh] of b.rects) if (x >= rx && x <= rx + rw && y >= ry && y <= ry + rh) return b;
+  return null;
+}
+
+class Walker {
+  // c = { name, type }, residentNo = 寮生の中での通し番号
+  constructor(c, residentNo) {
+    this.name = c.name; this.type = c.type; this.grade = c.grade;
+    if (this.type === 'dorm') { // 寮1と寮2に交互に割り当て、自分の寮室を持つ
+      this.dorm = residentNo % 2 ? 'dorm2' : 'dorm1';
+      const rooms = POOL.home[this.dorm];
+      this.home = rooms[(Math.floor(residentNo / 2) * 7) % rooms.length];
+    }
+    this.ox = (Math.random() - .5) * 8; this.oy = (Math.random() - .5) * 6;
+    this.speed = 26 + Math.random() * 16;
+    this.phase = Math.random() * 6;
+    this.at = N.gate; this.x = this.at.x; this.y = this.at.y;
+    this.to = null; this.path = []; this.delay = 0; this.wait = 0; this.replan = false; this.away = false;
+    this.leader = null; this.followers = []; this.gather = 0; // 一緒に行動する相手
+    const g = document.createElementNS(SVGNS, 'g');
+    g.innerHTML = `<g transform="scale(${CHAR_SCALE})"><g class="fig">${FIGURE}</g></g><text class="char-name" y="${-44 * CHAR_SCALE - 2}"></text>`;
+    g.querySelector('text').textContent = this.name;
+    this.g = g; this.fig = g.querySelector('.fig');
+    this.lL = g.querySelector('.lL'); this.lR = g.querySelector('.lR'); this.aL = g.querySelector('.aL'); this.aR = g.querySelector('.aR');
+    $('chars').appendChild(g);
+    this.plan(true);
+  }
+  goalFor(kind) {
+    const q = Math.random();
+    if (this.type === 'commute') { // 通学の人は寮に入らない。朝食の時間帯は自由に過ごす
+      if (kind === 'meal' && gameMin < 10 * 60) kind = 'free';
+      if (kind === 'wake' || kind === 'sleep' || kind === 'evening') kind = 'free';
+    }
+    const own = POOL.common[this.dorm];
+    switch (kind) {
+      case 'sleep': return this.home;
+      case 'wake': return q < .5 ? this.home : pickOne(own);
+      case 'meal': return pickOne(POOL.meal);
+      case 'class': return pickOne(POOL.class);
+      case 'class2': return q < .65 ? pickOne(POOL.class) : pickOne(POOL.pe);
+      case 'free': return q < .3 ? pickOne(POOL.lib) : pickOne(POOL.free);
+      default: return q < .3 ? this.home : q < .6 ? pickOne(own) : q < .8 ? pickOne(POOL.lib) : pickOne(POOL.free);
+    }
+  }
+  // 今の時刻に合わせて行き先を決め直す。jump=true のときは、その場所へ直接移す(時刻を手で動かしたとき)
+  plan(jump) {
+    const st = this.type === 'commute' ? commuteState(gameMin) : 'here', wasAway = this.away;
+    this.leader = null; this.followers = []; this.gather = 0; // 連れ立ちはいったん解散
+    this.away = st === 'away';
+    if (this.away) { this.to = null; this.path = []; this.replan = false; this.at = N.gate; this.x = this.at.x; this.y = this.at.y; return this.draw(0); }
+    this.kind = st === 'leaving' ? 'leave' : PERIODS[curPeriod][2];
+    this.goal = st === 'leaving' ? 'gate' : this.goalFor(this.kind);
+    if (jump) {
+      this.at = N[this.goal]; this.to = null; this.path = []; this.replan = false; this.delay = 0;
+      this.x = this.at.x; this.y = this.at.y; this.wait = Math.random() * 4;
+    } else {
+      if (wasAway) { this.at = N.gate; this.to = null; this.x = this.at.x; this.y = this.at.y; } // 登校:正門から入ってくる
+      this.delay = Math.random() * (wasAway ? 25 : 8); this.replan = true;
+    }
+    this.draw(0);
+  }
+  step(dt) {
+    if (this.away) return;
+    let speed = this.speed;
+    const L = this.leader;
+    if (L && (L.away || !L.followers.includes(this))) this.leader = null; // 相手がいなくなったら一人で行動
+    if (this.leader) {
+      // 連れ:相手のいる場所まで行き、追いついたら同じ方向へ並んで歩く
+      const together = this.at === L.at;
+      speed = L.speed * (together ? 1 : 1.3);
+      if (!this.to) {
+        if (this.wait > 0) { this.wait -= dt; return this.draw(0); }
+        if (!together) { const p = route(this.at.id, L.at.id); if (!p.length) return this.draw(0); this.to = N[p[0]]; }
+        else if (L.to) this.to = L.to;
+        else return this.draw(0);
+      }
+    } else {
+    // 誘った側:相手が集まるまで少し待つ
+    if (this.gather > 0 && this.followers.length && !this.to) {
+      this.gather -= dt;
+      if (!this.followers.every(f => f.at === this.at && !f.to)) return this.draw(0);
+      this.gather = 0;
+    }
+    if (this.delay > 0) this.delay -= dt;
+    else if (this.replan && !this.to) { this.path = route(this.at.id, this.goal); this.replan = false; this.wait = 0; }
+    if (!this.to) {
+      if (this.wait > 0) { this.wait -= dt; return this.draw(0); }
+      if (!this.path.length) {
+        if (this.replan || !ROAM.has(this.kind)) return this.draw(0); // 次の時間帯までその場にいる
+        this.goal = this.goalFor(this.kind);
+        this.path = route(this.at.id, this.goal);
+        if (!this.path.length) { this.wait = 4; return this.draw(0); }
+      }
+      this.to = N[this.path.shift()];
+    }
+    }
+    const dx = this.to.x - this.x, dy = this.to.y - this.y, d = Math.hypot(dx, dy), mv = speed * dt;
+    if (d <= mv) {
+      const stairs = this.at.f !== this.to.f;
+      this.x = this.to.x; this.y = this.to.y; this.at = this.to; this.to = null;
+      if (stairs) this.wait = 1.5;                                   // 階段の上り下り
+      else if (!this.leader && !this.path.length) {
+        this.wait = ROAM.has(this.kind) ? 6 + Math.random() * 14 : 0;
+        // 自由に過ごす時間帯は、目的地に着いたところで解散することがある
+        if (ROAM.has(this.kind) && this.followers.length && Math.random() < .4) {
+          this.followers.forEach(f => { f.leader = null; f.wait = 3 + Math.random() * 8; });
+          this.followers = [];
+        }
+      }
+    } else { this.x += dx / d * mv; this.y += dy / d * mv; }
+    this.phase += dt * speed * .34;
+    this.draw(Math.sin(this.phase));
+  }
+  draw(s) {
+    const x = this.x + this.ox, y = this.y + this.oy, f = this.at.f;
+    // 建物の中にいる人は、その建物で表示中の階と同じ階にいるときだけ見える。帰宅中の人は見えない
+    const b = f > 1 ? BY_ID[this.at.bld] : buildingAt(x, y);
+    const vis = !this.away && !(b && shownFloor(b) !== f);
+    if (vis !== this.vis) { this.g.style.display = vis ? '' : 'none'; this.vis = vis; }
+    if (!vis) return;
+    const tr = `translate(${x.toFixed(1)},${y.toFixed(1)})`;
+    if (tr !== this.tr) { this.g.setAttribute('transform', tr); this.tr = tr; }
+    if (s !== this.ls) {
+      this.ls = s;
+      this.lL.setAttribute('x2', (-3.2 + s * 4.5).toFixed(2)); this.lR.setAttribute('x2', (3.2 - s * 4.5).toFixed(2));
+      this.aL.setAttribute('x2', (-10.5 - s * 2.5).toFixed(2)); this.aR.setAttribute('x2', (10.5 - s * 2.5).toFixed(2));
+      this.fig.setAttribute('transform', `translate(0,${(-Math.abs(s) * 1.3).toFixed(2)})`);
+    }
+  }
+}
+
+/* ---------- 連れ立ち ----------
+   時間帯が変わるたびに、ときどき2〜3人の組ができる。
+   組になった人は同じ場所へ向かい(同じ教室で授業、同じ卓で食事など)、合流してから並んで歩く。 */
+const GROUP_CHANCE = 0.4;                 // 1人が誰かを誘う確率
+const GROUP_KINDS = ['class', 'class2', 'meal', 'free', 'evening', 'leave'];
+function formGroups(jump, list = walkers) {
+  const pool = list.filter(w => !w.away && !w.leader && !w.followers.length && GROUP_KINDS.includes(w.kind)).sort(() => Math.random() - .5);
+  while (pool.length > 1) {
+    const L = pool.pop();
+    if (Math.random() > GROUP_CHANCE) continue;
+    for (let n = Math.random() < .3 ? 2 : 1; n > 0; n--) {
+      // 授業を一緒に受けるのは同じ学年どうしだけ(食事や放課後は学年を問わない)
+      const j = pool.findIndex(w => w.kind === L.kind && (!/^class/.test(L.kind) || w.grade === L.grade));
+      if (j < 0) break;
+      const f = pool.splice(j, 1)[0];
+      f.leader = L; L.followers.push(f);
+      f.goal = L.goal; f.path = []; f.replan = false; f.delay = 0;
+      if (jump) { f.at = L.at; f.to = null; f.x = L.x; f.y = L.y; f.wait = 0; f.draw(0); }
+    }
+    if (L.followers.length) L.gather = 30;
+  }
+}
+
+// 帰宅中の人の一覧(アイコン+名前+「帰宅」)
+const AWAY_ICON = `<svg viewBox="-12 -42 24 44" width="11" height="20" aria-hidden="true">${FIGURE}</svg>`;
+let awayKey = null;
+function showAway() {
+  const list = walkers.filter(w => w.away), key = list.map(w => w.name).join('\n');
+  if (key === awayKey) return;
+  awayKey = key;
+  const el = $('away');
+  el.hidden = !list.length;
+  el.innerHTML = list.length ? '<b>帰宅</b>' + list.map(() => `<span class="chip">${AWAY_ICON}<span></span><em>帰宅</em></span>`).join('') : '';
+  el.querySelectorAll('.chip > span').forEach((sp, i) => { sp.textContent = list[i].name; });
+}
+
+function spawn(chars) {
+  $('chars').innerHTML = '';
+  let residents = 0;
+  walkers = chars.map(c => new Walker(c, c.type === 'dorm' ? residents++ : 0));
+  formGroups(true);
+  awayKey = null; showAway();
+}
+
+/* ---------- 時計 ---------- */
+let sliderHeld = false, shownMin = -1, shownNight = -1;
+function nightLevel(m) { // 夜の暗さ(0〜1)
+  const h = m / 60;
+  if (h >= 6.5 && h <= 17.5) return 0;
+  if (h > 17.5 && h < 20) return (h - 17.5) / 2.5;
+  if (h > 4.5 && h < 6.5) return (6.5 - h) / 2;
+  return 1;
+}
+function showClock() {
+  const m = Math.floor(gameMin);
+  if (m === shownMin) return;
+  shownMin = m;
+  $('clkTime').textContent = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  $('clkPeriod').textContent = PERIODS[curPeriod][1];
+  if (!sliderHeld) $('clkSlider').value = m;
+  const nl = Math.round(nightLevel(gameMin) * 26) / 100;
+  if (nl !== shownNight) { $('night').style.opacity = nl; shownNight = nl; }
+}
+function setTime(m) { // 時刻を直接指定(全員をその時間帯の場所へ移す)
+  gameMin = ((m % 1440) + 1440) % 1440;
+  curPeriod = periodAt(gameMin); curCommute = commuteState(gameMin);
+  walkers.forEach(w => w.plan(true));
+  formGroups(true);
+  showAway(); showClock();
+}
+$('clkSlider').addEventListener('pointerdown', () => { sliderHeld = true; });
+$('clkSlider').addEventListener('input', e => setTime(+e.target.value));
+$('clkSlider').addEventListener('change', () => { sliderHeld = false; });
+$('speedSeg').addEventListener('click', e => {
+  if (e.target.dataset.s === undefined) return;
+  speedKey = +e.target.dataset.s;
+  document.querySelectorAll('#speedSeg button').forEach(b => b.classList.toggle('on', +b.dataset.s === speedKey));
+});
+
+let last = performance.now(), frame = 0;
+function tick(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  const [rate, mul] = SPEEDS[speedKey];
+  gameMin = (gameMin + dt * rate) % 1440;
+  const pi = periodAt(gameMin), cs = commuteState(gameMin);
+  if (pi !== curPeriod) { curPeriod = pi; curCommute = cs; walkers.forEach(w => w.plan(false)); formGroups(false); showAway(); }
+  else if (cs !== curCommute) { // 通学の人の登校・下校(連れ立って帰ることもある)
+    curCommute = cs;
+    const commuters = walkers.filter(w => w.type === 'commute');
+    commuters.forEach(w => w.plan(false)); formGroups(false, commuters); showAway();
+  }
+  for (const w of walkers) rate ? w.step(dt * mul) : w.draw(0);
+  showClock();
+  if (++frame % 30 === 0) { // 手前の人を上に描く
+    const sorted = [...walkers].sort((a, b) => (a.y + a.oy) - (b.y + b.oy));
+    const layer = $('chars');
+    sorted.forEach((w, i) => { if (layer.children[i] !== w.g) layer.insertBefore(w.g, layer.children[i] || null); });
+  }
+  requestAnimationFrame(tick);
+}
+
+/* =====================================================================
+   キャラクター登録(保存)
+   ===================================================================== */
+const cleanGrade = g => Math.min(6, Math.max(1, Math.round(+g) || 1));
+const cleanChar = c => typeof c === 'string' ? { name: c.trim(), grade: 1, type: 'dorm' } : { name: String(c && c.name || '').trim(), grade: cleanGrade(c && c.grade), type: c && c.type === 'commute' ? 'commute' : 'dorm' };
+function loadChars() {
+  try {
+    const v = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (Array.isArray(v) && v.length) { const list = v.map(cleanChar).filter(c => c.name).slice(0, MAX_CHARACTERS); if (list.length) return list; }
+  } catch (e) {}
+  return DEFAULT_CHARACTERS.map(c => ({ ...c }));
+}
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
+
+function addRow(c) {
+  const row = document.createElement('div');
+  row.className = 'crow';
+  row.innerHTML = '<input type="text" maxlength="12" placeholder="名前"><select class="grade" aria-label="学年">' + [1, 2, 3, 4, 5, 6].map(g => `<option value="${g}">${g}年</option>`).join('') + '</select><select class="type" aria-label="区分"><option value="dorm">寮生</option><option value="commute">通学</option></select><button type="button" class="del" aria-label="削除">×</button>';
+  row.querySelector('input').value = c.name;
+  row.querySelector('.grade').value = cleanGrade(c.grade);
+  row.querySelector('.type').value = c.type;
+  row.querySelector('.del').onclick = () => { row.remove(); updateCount(); };
+  $('rows').appendChild(row);
+  return row;
+}
+function fillRows(list) { $('rows').innerHTML = ''; list.forEach(addRow); updateCount(); }
+function readRows() {
+  return [...document.querySelectorAll('#rows .crow')].map(r => ({ name: r.querySelector('input').value.trim(), grade: cleanGrade(r.querySelector('.grade').value), type: r.querySelector('.type').value })).filter(c => c.name).slice(0, MAX_CHARACTERS);
+}
+function updateCount() {
+  const n = document.querySelectorAll('#rows .crow').length;
+  $('namesCount').textContent = `${n} 人 / 最大 ${MAX_CHARACTERS} 人`;
+  $('rowAdd').disabled = n >= MAX_CHARACTERS;
+}
+
+let currentChars = loadChars();
+$('btnNames').onclick = () => { fillRows(currentChars); $('namesDlg').showModal(); };
+$('rowAdd').onclick = () => { addRow({ name: '', grade: 1, type: 'dorm' }).querySelector('input').focus(); updateCount(); };
+$('namesCancel').onclick = () => $('namesDlg').close();
+$('namesDefault').onclick = () => fillRows(DEFAULT_CHARACTERS);
+$('namesSave').onclick = () => {
+  currentChars = readRows();
+  let ok = true;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(currentChars)); } catch (e) { ok = false; }
+  spawn(currentChars);
+  $('namesDlg').close();
+  toast(ok ? `保存しました(${currentChars.length} 人)` : '反映しましたが、このブラウザでは保存できませんでした');
+};
+
+/* =====================================================================
+   操作(屋根の開閉・階の切り替え・拡大縮小・移動)と画面サイズへの対応
+   ===================================================================== */
+const svg = $('map');
+const FULL = { x: -520, y: -100, w: 3040, h: 1800 };   // 題字・凡例を含む全体(横長の画面)
+const CAMPUS = { x: 90, y: 60, w: 2220, h: 1500 };     // 敷地だけ(縦長・幅の狭い画面)
+const homeBox = () => (svg.clientWidth / svg.clientHeight >= 1.25 ? FULL : CAMPUS);
+let home = homeBox(), vb = { ...home }, atHome = true, moved = false;
+const upx = () => Math.max(vb.w / svg.clientWidth, vb.h / svg.clientHeight); // 画面1pxあたりの地図の長さ
+function applyVB() {
+  svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  svg.style.setProperty('--u', upx() || 2); // 名前の文字は拡大率によらず画面上で同じ大きさにする
+}
+const toMap = (sx, sy) => { const u = upx(); return { x: vb.x + vb.w / 2 + (sx - svg.clientWidth / 2) * u, y: vb.y + vb.h / 2 + (sy - svg.clientHeight / 2) * u }; };
+// 画面上の点 (sx, sy) に地図上の点 p が来るように、幅 w で表示する
+function placeAt(p, sx, sy, w) {
+  vb.w = Math.max(280, Math.min(3600, w)); vb.h = vb.w * home.h / home.w;
+  const u = upx();
+  vb.x = p.x - vb.w / 2 - (sx - svg.clientWidth / 2) * u; vb.y = p.y - vb.h / 2 - (sy - svg.clientHeight / 2) * u;
+  atHome = false; applyVB();
+}
+function goHome() { home = homeBox(); vb = { ...home }; atHome = true; applyVB(); }
+
+// 他のページに埋め込まれているとき(Studio の Embed など)は、ページのスクロールを邪魔しないよう Ctrl+ホイールで拡大縮小する
+let EMBEDDED = false;
+try { EMBEDDED = window.self !== window.top; } catch (e) { EMBEDDED = true; }
+svg.addEventListener('wheel', e => {
+  if (EMBEDDED && !e.ctrlKey && !e.metaKey && !document.fullscreenElement) { toast('拡大縮小は Ctrl + ホイール、または右上の ＋ / − ボタン'); return; }
+  e.preventDefault();
+  placeAt(toMap(e.clientX, e.clientY), e.clientX, e.clientY, vb.w * Math.exp(e.deltaY * 0.0012));
+}, { passive: false });
+$('zoomSeg').addEventListener('click', e => {
+  if (!e.target.dataset.z) return;
+  const cx = svg.clientWidth / 2, cy = svg.clientHeight / 2;
+  placeAt(toMap(cx, cy), cx, cy, vb.w * +e.target.dataset.z);
+});
+if (document.fullscreenEnabled) {
+  $('btnFull').hidden = false;
+  $('btnFull').onclick = () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); };
+  document.addEventListener('fullscreenchange', () => { $('btnFull').textContent = document.fullscreenElement ? '全画面を終了' : '全画面'; });
+}
+if (EMBEDDED) $('hint').textContent = '建物をクリック：屋根の開閉 ／ Ctrl+ホイール・ピンチ：拡大縮小 ／ ドラッグ：移動';
+
+// ドラッグで移動、指2本で拡大縮小
+const pointers = new Map();
+let gesture = null;
+function startGesture() {
+  const pts = [...pointers.values()];
+  if (pts.length === 1) gesture = { kind: 'pan', p: toMap(pts[0].x, pts[0].y) };
+  else if (pts.length >= 2) {
+    const mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
+    gesture = { kind: 'pinch', p: toMap(mx, my), d: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1, w: vb.w };
+  } else gesture = null;
+}
+svg.addEventListener('pointerdown', e => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
+  if (pointers.size === 1) moved = false; else moved = true;
+  startGesture();
+});
+window.addEventListener('pointermove', e => {
+  const pt = pointers.get(e.pointerId);
+  if (!pt || !gesture) return;
+  pt.x = e.clientX; pt.y = e.clientY;
+  const pts = [...pointers.values()];
+  if (gesture.kind === 'pan') {
+    if (!moved && Math.hypot(pt.x - pt.sx, pt.y - pt.sy) < 6) return;
+    moved = true; svg.classList.add('panning');
+    placeAt(gesture.p, pt.x, pt.y, vb.w);
+  } else if (pts.length >= 2) {
+    const mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2, d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    placeAt(gesture.p, mx, my, gesture.w * gesture.d / d);
+  }
+});
+function endPointer(e) { if (!pointers.delete(e.pointerId)) return; svg.classList.remove('panning'); startGesture(); }
+window.addEventListener('pointerup', endPointer);
+window.addEventListener('pointercancel', endPointer);
+window.addEventListener('resize', () => { if (atHome) goHome(); else applyVB(); });
+
+svg.addEventListener('click', e => {
+  if (moved) { moved = false; return; }
+  const hit = e.target.closest('.roof, .interior, .legend-row');
+  if (hit && hit.dataset.id) toggleRoof(hit.dataset.id);
+});
+$('floorSeg').addEventListener('click', e => { if (e.target.dataset.f) setFloor(+e.target.dataset.f); });
+$('btnReset').onclick = goHome;
+
+// 確認用:URLの末尾に #f2 で2階表示、#@1330 で13:30から、#f2@1330 で両方
+const m = location.hash.match(/^#(?:f(\d))?(?:@(\d\d)(\d\d))?$/);
+setFloor(m && m[1] ? Math.min(3, Math.max(1, +m[1])) : 1);
+if (m && m[2]) { gameMin = (+m[2] * 60 + +m[3]) % 1440; curPeriod = periodAt(gameMin); curCommute = commuteState(gameMin); }
+setAllRoofs(true); // 最初は屋根を開いた状態
+applyVB();
+spawn(currentChars);
+showClock();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
