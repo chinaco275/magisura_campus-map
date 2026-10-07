@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>国立スライム学園 キャンパスマップ</title>
 <style>
   :root {
@@ -57,10 +57,17 @@
   .seg button { border: 0; border-left: 1.5px solid var(--ink); border-radius: 0; }
   .seg button.on { background: var(--ink); color: var(--cream); }
 
-  #toolbar { position: fixed; top: 10px; left: 10px; right: 10px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; pointer-events: none; }
+  /* 操作部品はすべて #ui の中。広い画面では上(ツールバー)と下(時計)に分かれ、タブレット・スマホでは上にまとめる */
+  /* --vt / --vb:埋め込み枠のうち画面からはみ出している上側・下側の長さ(スクリプトが実測して入れる)。
+     これで操作部品は常に「いま画面に見えている範囲」の上端と下端に付く。直接開いたときは 0 */
+  #ui { position: fixed; left: 0; right: 0; top: var(--vt, 0px); bottom: var(--vb, 0px); display: flex; flex-direction: column; gap: 8px;
+        padding: 10px 10px max(10px, env(safe-area-inset-bottom)); pointer-events: none; }
+  #uiGap { flex: 1; }
+  #toolbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
   #toolbar > * { pointer-events: auto; }
+  .sm { display: none; }
 
-  #bottom { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+  #bottom { display: flex; flex-direction: column; align-items: center; gap: 8px; }
   #bottom > * { pointer-events: auto; max-width: 100%; }
   #away { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; background: rgba(245,240,228,.96);
           border: 1.5px solid var(--ink); border-radius: 5px; padding: 6px 10px; font-size: 13px; }
@@ -99,16 +106,21 @@
 
   /* ---- 画面の幅に合わせる ---- */
   @media (max-width: 1700px) { #hint { display: none; } }
-  @media (max-width: 720px) {
-    button { font-size: 12px; padding: 7px 9px; }
-    .seg > span { font-size: 12px; padding: 0 7px 0 9px; }
-    #toolbar { top: 6px; left: 6px; right: 6px; gap: 6px; }
-    #bottom { padding: 6px; gap: 6px; }
-    #clock { width: 100%; padding: 8px 10px; flex-wrap: wrap; }
-    #clkTime { font-size: 21px; }
-    #clkSlider { flex-basis: 150px; }
+  @media (max-width: 1024px) {
+    /* タブレット・スマホ:見出しを省いて小さくまとめる(ツールバーは上、時計は下) */
+    #ui { padding: 6px 6px max(8px, env(safe-area-inset-bottom)); gap: 6px; }
+    #toolbar { justify-content: center; gap: 6px; }
+    #bottom { gap: 6px; }
+    .seg > span, .lg { display: none; }
+    .sm { display: inline; }
+    button { font-size: 12px; padding: 7px 10px; }
+    #clock { width: 100%; padding: 6px 10px; gap: 6px 10px; flex-wrap: wrap; }
+    #clock .now { gap: 8px; }
+    #clkTime { font-size: 20px; min-width: 2.9em; }
+    #clkPeriod { min-width: 0; font-size: 12px; }
+    #clkSlider { flex: 1 1 110px; min-width: 90px; }
     #clock .seg button { padding: 6px 9px; font-size: 12px; }
-    #away { font-size: 12px; }
+    #away { font-size: 12px; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; width: 100%; padding: 5px 8px; }
   }
 </style>
 </head>
@@ -139,14 +151,15 @@
 </svg>
 
 <div id="night"></div>
+<div id="ui">
 <div id="toolbar">
   <div class="seg" id="floorSeg"><span>表示する階</span><button data-f="1" class="on">1階</button><button data-f="2">2階</button><button data-f="3">3階</button></div>
   <div class="seg" id="zoomSeg"><span>拡大縮小</span><button data-z="1.5" aria-label="縮小">−</button><button data-z="0.667" aria-label="拡大">＋</button></div>
-  <button id="btnReset">表示リセット</button>
+  <button id="btnReset"><span class="lg">表示リセット</span><span class="sm">リセット</span></button>
   <button id="btnFull" hidden>全画面</button>
-  <button id="btnNames" class="primary">キャラクター登録</button>
+  <button id="btnNames" class="primary"><span class="lg">キャラクター登録</span><span class="sm">登録</span></button>
 </div>
-<div id="hint">建物をクリック：屋根の開閉 ／ ホイール・ピンチ：拡大縮小 ／ ドラッグ：移動</div>
+<div id="uiGap"></div>
 <div id="bottom">
   <div id="away" hidden></div>
   <div id="clock">
@@ -155,6 +168,8 @@
     <div class="seg" id="speedSeg"><span>時間の進み</span><button data-s="0">停止</button><button data-s="1" class="on">ゆっくり</button><button data-s="2">ふつう</button><button data-s="3">速い</button></div>
   </div>
 </div>
+</div>
+<div id="hint">建物をクリック：屋根の開閉 ／ ホイール・ピンチ：拡大縮小 ／ ドラッグ：移動</div>
 <div id="toast"></div>
 
 <dialog id="namesDlg">
@@ -1131,7 +1146,32 @@ function placeAt(p, sx, sy, w) {
   vb.x = p.x - vb.w / 2 - (sx - svg.clientWidth / 2) * u; vb.y = p.y - vb.h / 2 - (sy - svg.clientHeight / 2) * u;
   atHome = false; applyVB();
 }
-function goHome() { home = homeBox(); vb = { ...home }; atHome = true; applyVB(); }
+function goHome() {
+  home = homeBox(); vb = { ...home };
+  if (home === CAMPUS) {
+    // 縦長の画面:ツールバーと時計のあいだに敷地を置く(収まらないときはツールバーのすぐ下から)
+    const top = $('toolbar').getBoundingClientRect().bottom + 6, bot = $('bottom').getBoundingClientRect().top - 6;
+    const mapH = CAMPUS.h / upx();
+    placeAt({ x: CAMPUS.x + CAMPUS.w / 2, y: CAMPUS.y + CAMPUS.h / 2 }, svg.clientWidth / 2, mapH <= bot - top ? (top + bot) / 2 : top + mapH / 2, CAMPUS.w);
+  }
+  atHome = true; applyVB();
+}
+
+// 埋め込み枠が画面より大きいとき、枠のうち実際に画面に見えている範囲を測り、操作部品をその中に収める。
+// (IntersectionObserver は、別サイトに埋め込まれた枠の中からでも「画面に見えている部分」を教えてくれる)
+let visTop = 0, visBottom = 0;
+if ('IntersectionObserver' in window) {
+  const steps = []; for (let i = 0; i <= 200; i++) steps.push(i / 200);
+  new IntersectionObserver(entries => {
+    const e = entries[entries.length - 1];
+    if (!e.isIntersecting) return;
+    const h = window.innerHeight, t = Math.max(0, Math.round(e.intersectionRect.top)), b = Math.max(0, Math.round(h - e.intersectionRect.bottom));
+    if (h - t - b < 240 || (t === visTop && b === visBottom)) return; // 見えている部分が狭すぎるときは動かさない
+    visTop = t; visBottom = b;
+    $('ui').style.setProperty('--vt', t + 'px'); $('ui').style.setProperty('--vb', b + 'px');
+    if (atHome) goHome();
+  }, { threshold: steps }).observe($('night'));
+}
 
 // 他のページに埋め込まれているとき(Studio の Embed など)は、ページのスクロールを邪魔しないよう Ctrl+ホイールで拡大縮小する
 let EMBEDDED = false;
@@ -1204,6 +1244,7 @@ setAllRoofs(true); // 最初は屋根を開いた状態
 applyVB();
 spawn(currentChars);
 showClock();
+goHome(); // 操作部品の高さが決まってから、最初の表示位置を決める
 requestAnimationFrame(tick);
 </script>
 </body>
